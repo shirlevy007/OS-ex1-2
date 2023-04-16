@@ -1,10 +1,86 @@
 #define MAX_THREAD_NUM 100 /* maximal number of threads */
 #define STACK_SIZE 4096 /* stack size per thread (in bytes) */
 
-typedef void (*thread_entry_point)(void);
+#define INVALID_QUANTUM ("invalid input: quantum_usecs should be positive")
+#define INVALID_EP ("invalid input: entry_point cannot be null")
+#define ABOVE_MAX ("invalid: creation of too many threads")
+#define FAIL(-1)
 
-/* External interface */
+enum States
+{
+    READY, RUNNING, BLOCKED
+};
 
+/* A translation is required when using an address of a variable.
+   Use this as a black box in your code. */
+address_t translate_address(address_t addr)
+{
+  address_t ret;
+  asm volatile("xor    %%gs:0x18,%0\n"
+               "rol    $0x9,%0\n"
+  : "=g" (ret)
+  : "0" (addr));
+  return ret;
+}
+
+//TODO: MAKE SURE ITS OK:
+
+class Tread
+{
+#define JB_SP 6
+#define JB_PC 7
+  typedef unsigned long int address_t;
+
+  unsigned int tid;
+  unsigned int quantum;
+  char *stack;
+  States state;
+  sigjmp_buf env;
+  address_t sp;
+  address_t pc;
+
+ public:
+  Thread(unsigned int tid, void *stack, thread_entry_point entry_point)
+  {
+    this.tid = thread_count++;
+    address_t sp = (address_t) stack + STACK_SIZE - sizeof (address_t);
+    address_t pc = (address_t) entry_point;
+    sigsetjmp (env, thread_count);
+    (env->__jmpbuf)[JB_SP] = translate_address (sp);
+    (env->__jmpbuf)[JB_PC] = translate_address (pc);
+    sigemptyset (&env->__saved_mask);
+  }
+//
+//  void start()
+//  {
+//    siglongjmp (env, thread_count++);
+//  }
+
+ private:
+  typedef unsigned long int address_t;
+  static address_t translate_address(address_t addr)
+  {
+    // Implementation-specific translation of address
+    return addr;
+  }
+};
+
+void setup_thread(int tid, char *stack, thread_entry_point entry_point)
+{
+  // initializes env[tid] to use the right stack, and to run from the function 'entry_point', when we'll use
+  // siglongjmp to jump into the thread.
+  address_t sp = (address_t) stack + STACK_SIZE - sizeof (address_t);
+  address_t pc = (address_t) entry_point;
+  sigsetjmp (env[tid], 1);
+  (env[tid]->__jmpbuf)[JB_SP] = translate_address (sp);
+  (env[tid]->__jmpbuf)[JB_PC] = translate_address (pc);
+  sigemptyset (&env[tid]->__saved_mask);
+}
+
+// Global vars
+int current_thread = 0; //current thread index in the ready list
+int creations = 0; //0-MAX, counter of the creations of threads
+Thread *ready[MAX_THREAD_NUM]; //ready list
 
 /**
  * @brief initializes the thread library.
@@ -18,8 +94,17 @@ typedef void (*thread_entry_point)(void);
  *
  * @return On success, return 0. On failure, return -1.
 */
-int uthread_init(int quantum_usecs){
+int uthread_init(int quantum_usecs)
+{
+  if(quantum_usecs <= 0)
+  {
+    std::cerr << INVALID_QUANTUM << std::endl;
+    return FAIL;
+  }
+  //TODO: FINISHHHH
 
+
+//  setup_thread(0, stack0, thread0);
 }
 
 /**
@@ -34,9 +119,48 @@ int uthread_init(int quantum_usecs){
  *
  * @return On success, return the ID of the created thread. On failure, return -1.
 */
-int uthread_spawn(thread_entry_point entry_point){
+int uthread_spawn(thread_entry_point entry_point)
+{
+  if(entry_point == nullptr)
+  {
+    std::cerr << INVALID_EP << std::endl;
+    return FAIL;
+  }
+  int tid = helper_spawn();
+  if(tid < 0)
+  {
+    std::cerr << ABOVE_MAX << std::endl;
+    return FAIL;
+  }
+
+
+  return tid;
+}
+
+int helper_spawn(){
+  for(int i = 0; i < MAX_THREAD_NUM; ++i)
+  {
+    if (ready[i] == nullptr){
+      return i;
+    }
+  }
+  // no empty spot at the ready list
+  return FAIL;
+}
+
+void thread_creator(unsigned int tid, thread_entry_point entry_point){
+  Thread t = new Thread(tid, entry_point);
+  ready[tid] = t;
+  current_thread++;
+
+  if(tid==0){ //main thread
+    ready[0]->state = RUNNING;
+  }
+
+  //TODO: FINISHHHH
 
 }
+
 
 
 /**
@@ -49,10 +173,9 @@ int uthread_spawn(thread_entry_point entry_point){
  * @return The function returns 0 if the thread was successfully terminated and -1 otherwise. If a thread terminates
  * itself or the main thread is terminated, the function does not return.
 */
-int uthread_terminate(int tid){
-
+int uthread_terminate(int tid)
+{
 }
-
 
 /**
  * @brief Blocks the thread with ID tid. The thread may be resumed later using uthread_resume.
@@ -63,10 +186,9 @@ int uthread_terminate(int tid){
  *
  * @return On success, return 0. On failure, return -1.
 */
-int uthread_block(int tid){
-
+int uthread_block(int tid)
+{
 }
-
 
 /**
  * @brief Resumes a blocked thread with ID tid and moves it to the READY state.
@@ -76,10 +198,9 @@ int uthread_block(int tid){
  *
  * @return On success, return 0. On failure, return -1.
 */
-int uthread_resume(int tid){
-
+int uthread_resume(int tid)
+{
 }
-
 
 /**
  * @brief Blocks the RUNNING thread for num_quantums quantums.
@@ -94,20 +215,18 @@ int uthread_resume(int tid){
  *
  * @return On success, return 0. On failure, return -1.
 */
-int uthread_sleep(int num_quantums){
-
+int uthread_sleep(int num_quantums)
+{
 }
-
 
 /**
  * @brief Returns the thread ID of the calling thread.
  *
  * @return The ID of the calling thread.
 */
-int uthread_get_tid(){
-
+int uthread_get_tid()
+{
 }
-
 
 /**
  * @brief Returns the total number of quantums since the library was initialized, including the current quantum.
@@ -117,10 +236,9 @@ int uthread_get_tid(){
  *
  * @return The total number of quantums.
 */
-int uthread_get_total_quantums(){
-
+int uthread_get_total_quantums()
+{
 }
-
 
 /**
  * @brief Returns the number of quantums the thread with ID tid was in RUNNING state.
@@ -131,8 +249,8 @@ int uthread_get_total_quantums(){
  *
  * @return On success, return the number of quantums of the thread with ID tid. On failure, return -1.
 */
-int uthread_get_quantums(int tid){
-
+int uthread_get_quantums(int tid)
+{
 }
 
 
