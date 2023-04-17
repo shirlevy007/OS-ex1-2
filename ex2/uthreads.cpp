@@ -6,15 +6,13 @@
 #define ABOVE_MAX ("invalid: creation of too many threads")
 #define FAIL(-1)
 
-enum States
-{
+enum States {
     READY, RUNNING, BLOCKED
 };
 
 /* A translation is required when using an address of a variable.
    Use this as a black box in your code. */
-address_t translate_address(address_t addr)
-{
+address_t translate_address(address_t addr) {
   address_t ret;
   asm volatile("xor    %%gs:0x18,%0\n"
                "rol    $0x9,%0\n"
@@ -25,8 +23,7 @@ address_t translate_address(address_t addr)
 
 //TODO: MAKE SURE ITS OK:
 
-class Tread
-{
+class Tread {
 #define JB_SP 6
 #define JB_PC 7
   typedef unsigned long int address_t;
@@ -40,8 +37,7 @@ class Tread
   address_t pc;
 
  public:
-  Thread(unsigned int tid, void *stack, thread_entry_point entry_point)
-  {
+  Thread(unsigned int tid, void *stack, thread_entry_point entry_point) {
     this.tid = thread_count++;
     address_t sp = (address_t) stack + STACK_SIZE - sizeof (address_t);
     address_t pc = (address_t) entry_point;
@@ -58,15 +54,13 @@ class Tread
 
  private:
   typedef unsigned long int address_t;
-  static address_t translate_address(address_t addr)
-  {
+  static address_t translate_address(address_t addr) {
     // Implementation-specific translation of address
     return addr;
   }
 };
 
-void setup_thread(int tid, char *stack, thread_entry_point entry_point)
-{
+void setup_thread(int tid, char *stack, thread_entry_point entry_point) {
   // initializes env[tid] to use the right stack, and to run from the function 'entry_point', when we'll use
   // siglongjmp to jump into the thread.
   address_t sp = (address_t) stack + STACK_SIZE - sizeof (address_t);
@@ -78,9 +72,10 @@ void setup_thread(int tid, char *stack, thread_entry_point entry_point)
 }
 
 // Global vars
-int current_thread = 0; //current thread index in the ready list
+int current_thread = 0; //current thread index in the threads list
 int creations = 0; //0-MAX, counter of the creations of threads
-Thread *ready[MAX_THREAD_NUM]; //ready list
+Thread * threads[MAX_THREAD_NUM]; //threads list
+set::deque<Tread*> ready_queue; // ready threads queue
 
 /**
  * @brief initializes the thread library.
@@ -94,10 +89,8 @@ Thread *ready[MAX_THREAD_NUM]; //ready list
  *
  * @return On success, return 0. On failure, return -1.
 */
-int uthread_init(int quantum_usecs)
-{
-  if(quantum_usecs <= 0)
-  {
+int uthread_init(int quantum_usecs) {
+  if(quantum_usecs <= 0) {
     std::cerr << INVALID_QUANTUM << std::endl;
     return FAIL;
   }
@@ -106,6 +99,8 @@ int uthread_init(int quantum_usecs)
 
 //  setup_thread(0, stack0, thread0);
 }
+
+///----------------------------------------------------------------------------
 
 /**
  * @brief Creates a new thread, whose entry point is the function entry_point with the signature
@@ -119,49 +114,46 @@ int uthread_init(int quantum_usecs)
  *
  * @return On success, return the ID of the created thread. On failure, return -1.
 */
-int uthread_spawn(thread_entry_point entry_point)
-{
-  if(entry_point == nullptr)
-  {
+int uthread_spawn(thread_entry_point entry_point) {
+  if(entry_point == nullptr) {
     std::cerr << INVALID_EP << std::endl;
     return FAIL;
   }
-  int tid = helper_spawn();
-  if(tid < 0)
-  {
+  int tid = helper_spawn ();
+  if(tid < 0) {
     std::cerr << ABOVE_MAX << std::endl;
     return FAIL;
   }
 
-
+  Thread t = new Tread(tid, entry_point);
+  //TODO: if tid==0 -> main thread should be RUNNING
+  threads[tid] = t;
+  ///////////////////////
   return tid;
 }
 
-int helper_spawn(){
-  for(int i = 0; i < MAX_THREAD_NUM; ++i)
-  {
-    if (ready[i] == nullptr){
+int helper_spawn() {
+  for(int i = 0; i < MAX_THREAD_NUM; ++i) {
+    if(threads[i] == nullptr) {
       return i;
     }
   }
-  // no empty spot at the ready list
+  // no empty spot at the threads list
   return FAIL;
 }
 
-void thread_creator(unsigned int tid, thread_entry_point entry_point){
-  Thread t = new Thread(tid, entry_point);
-  ready[tid] = t;
+void thread_creator(unsigned int tid, thread_entry_point entry_point) {
+  Thread t = new Thread (tid, entry_point);
+  threads[tid] = t;
   current_thread++;
 
-  if(tid==0){ //main thread
-    ready[0]->state = RUNNING;
+  if(tid == 0) { //main thread
+    threads[0]->state = RUNNING;
   }
 
   //TODO: FINISHHHH
 
 }
-
-
 
 /**
  * @brief Terminates the thread with ID tid and deletes it from all relevant control structures.
@@ -173,8 +165,7 @@ void thread_creator(unsigned int tid, thread_entry_point entry_point){
  * @return The function returns 0 if the thread was successfully terminated and -1 otherwise. If a thread terminates
  * itself or the main thread is terminated, the function does not return.
 */
-int uthread_terminate(int tid)
-{
+int uthread_terminate(int tid) {
 }
 
 /**
@@ -186,8 +177,7 @@ int uthread_terminate(int tid)
  *
  * @return On success, return 0. On failure, return -1.
 */
-int uthread_block(int tid)
-{
+int uthread_block(int tid) {
 }
 
 /**
@@ -198,8 +188,7 @@ int uthread_block(int tid)
  *
  * @return On success, return 0. On failure, return -1.
 */
-int uthread_resume(int tid)
-{
+int uthread_resume(int tid) {
 }
 
 /**
@@ -215,8 +204,7 @@ int uthread_resume(int tid)
  *
  * @return On success, return 0. On failure, return -1.
 */
-int uthread_sleep(int num_quantums)
-{
+int uthread_sleep(int num_quantums) {
 }
 
 /**
@@ -224,8 +212,7 @@ int uthread_sleep(int num_quantums)
  *
  * @return The ID of the calling thread.
 */
-int uthread_get_tid()
-{
+int uthread_get_tid() {
 }
 
 /**
@@ -236,8 +223,7 @@ int uthread_get_tid()
  *
  * @return The total number of quantums.
 */
-int uthread_get_total_quantums()
-{
+int uthread_get_total_quantums() {
 }
 
 /**
@@ -249,8 +235,7 @@ int uthread_get_total_quantums()
  *
  * @return On success, return the number of quantums of the thread with ID tid. On failure, return -1.
 */
-int uthread_get_quantums(int tid)
-{
+int uthread_get_quantums(int tid) {
 }
 
 
