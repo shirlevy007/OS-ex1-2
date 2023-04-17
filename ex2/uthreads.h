@@ -15,7 +15,7 @@ typedef void (*thread_entry_point)(void);
 
 class Thread{
   Thread(unsigned int tid, void *stack, thread_entry_point entry_point);
-  static address_t translate_address(address_t addr);
+//  static address_t translate_address(address_t addr);
 };
 
 /* External interface */
