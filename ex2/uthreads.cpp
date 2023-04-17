@@ -1,5 +1,9 @@
 #define MAX_THREAD_NUM 100 /* maximal number of threads */
 #define STACK_SIZE 4096 /* stack size per thread (in bytes) */
+#define JB_SP 6
+#define JB_PC 7
+typedef unsigned long int address_t;
+
 
 #define INVALID_QUANTUM ("invalid input: quantum_usecs should be positive")
 #define INVALID_EP ("invalid input: entry_point cannot be null")
@@ -24,9 +28,6 @@ address_t translate_address(address_t addr) {
 //TODO: MAKE SURE ITS OK:
 
 class Tread {
-#define JB_SP 6
-#define JB_PC 7
-  typedef unsigned long int address_t;
 
   unsigned int tid;
   unsigned int quantum;
@@ -46,36 +47,26 @@ class Tread {
     (env->__jmpbuf)[JB_PC] = translate_address (pc);
     sigemptyset (&env->__saved_mask);
   }
-//
-//  void start()
-//  {
-//    siglongjmp (env, thread_count++);
-//  }
 
- private:
-  typedef unsigned long int address_t;
-  static address_t translate_address(address_t addr) {
-    // Implementation-specific translation of address
-    return addr;
-  }
 };
 
-void setup_thread(int tid, char *stack, thread_entry_point entry_point) {
-  // initializes env[tid] to use the right stack, and to run from the function 'entry_point', when we'll use
-  // siglongjmp to jump into the thread.
-  address_t sp = (address_t) stack + STACK_SIZE - sizeof (address_t);
-  address_t pc = (address_t) entry_point;
-  sigsetjmp (env[tid], 1);
-  (env[tid]->__jmpbuf)[JB_SP] = translate_address (sp);
-  (env[tid]->__jmpbuf)[JB_PC] = translate_address (pc);
-  sigemptyset (&env[tid]->__saved_mask);
-}
+//void setup_thread(int tid, char *stack, thread_entry_point entry_point) {
+//  // initializes env[tid] to use the right stack, and to run from the function 'entry_point', when we'll use
+//  // siglongjmp to jump into the thread.
+//  address_t sp = (address_t) stack + STACK_SIZE - sizeof (address_t);
+//  address_t pc = (address_t) entry_point;
+//  sigsetjmp (env[tid], 1);
+//  (env[tid]->__jmpbuf)[JB_SP] = translate_address (sp);
+//  (env[tid]->__jmpbuf)[JB_PC] = translate_address (pc);
+//  sigemptyset (&env[tid]->__saved_mask);
+//}
 
 // Global vars
 int current_thread = 0; //current thread index in the threads list
 int creations = 0; //0-MAX, counter of the creations of threads
 Thread * threads[MAX_THREAD_NUM]; //threads list
-set::deque<Tread*> ready_queue; // ready threads queue
+std::deque<Tread*> ready_queue; // ready threads queue
+
 
 /**
  * @brief initializes the thread library.
@@ -124,11 +115,12 @@ int uthread_spawn(thread_entry_point entry_point) {
     std::cerr << ABOVE_MAX << std::endl;
     return FAIL;
   }
-
+  // entry_point is valid, and there is an available spot in the threads list
   Thread t = new Tread(tid, entry_point);
-  //TODO: if tid==0 -> main thread should be RUNNING
-  threads[tid] = t;
-  ///////////////////////
+  threads[tid] = t; // adds to our threads list
+  creations++; // adds the counter of threads in the threads list
+  ready_queue.push_back(t); // adds the thread to the back of the ready queue
+  //TODO: if tid==0 -> main thread should be RUNNING - here?
   return tid;
 }
 
@@ -140,19 +132,6 @@ int helper_spawn() {
   }
   // no empty spot at the threads list
   return FAIL;
-}
-
-void thread_creator(unsigned int tid, thread_entry_point entry_point) {
-  Thread t = new Thread (tid, entry_point);
-  threads[tid] = t;
-  current_thread++;
-
-  if(tid == 0) { //main thread
-    threads[0]->state = RUNNING;
-  }
-
-  //TODO: FINISHHHH
-
 }
 
 /**
