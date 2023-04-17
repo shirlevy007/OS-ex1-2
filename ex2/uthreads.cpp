@@ -8,6 +8,7 @@ typedef unsigned long int address_t;
 #define INVALID_QUANTUM ("invalid input: quantum_usecs should be positive")
 #define INVALID_EP ("invalid input: entry_point cannot be null")
 #define ABOVE_MAX ("invalid: creation of too many threads")
+#define NO_THREAD ("invalid: no thread with this tid")
 #define FAIL(-1)
 
 enum States {
@@ -32,6 +33,7 @@ class Tread {
   unsigned int tid;
   unsigned int quantum;
   char *stack;
+  thread_entry_point entry_point
   States state;
   sigjmp_buf env;
   address_t sp;
@@ -39,30 +41,27 @@ class Tread {
 
  public:
   Thread(unsigned int tid, void *stack, thread_entry_point entry_point) {
-    this.tid = thread_count++;
-    address_t sp = (address_t) stack + STACK_SIZE - sizeof (address_t);
-    address_t pc = (address_t) entry_point;
-    sigsetjmp (env, thread_count);
-    (env->__jmpbuf)[JB_SP] = translate_address (sp);
-    (env->__jmpbuf)[JB_PC] = translate_address (pc);
-    sigemptyset (&env->__saved_mask);
-  }
+      this->tid = thread_count++;
+      this->stack = stack;
+      this->entry_point = entry_point;
+      this->state = READY;
 
+      //from setup
+      this->sp = (address_t) stack + STACK_SIZE - sizeof(address_t);
+      this->pc = (address_t) entry_point;
+      sigsetjmp(env[tid], 1);
+//      (env[tid]->__jmpbuf)[JB_SP] = translate_address(sp);
+//      (env[tid]->__jmpbuf)[JB_PC] = translate_address(pc);
+      sigemptyset(&env[tid]->__saved_mask);
+
+  }
+  ~Thread() {
+
+  }
 };
 
-//void setup_thread(int tid, char *stack, thread_entry_point entry_point) {
-//  // initializes env[tid] to use the right stack, and to run from the function 'entry_point', when we'll use
-//  // siglongjmp to jump into the thread.
-//  address_t sp = (address_t) stack + STACK_SIZE - sizeof (address_t);
-//  address_t pc = (address_t) entry_point;
-//  sigsetjmp (env[tid], 1);
-//  (env[tid]->__jmpbuf)[JB_SP] = translate_address (sp);
-//  (env[tid]->__jmpbuf)[JB_PC] = translate_address (pc);
-//  sigemptyset (&env[tid]->__saved_mask);
-//}
-
-// Global vars
-int current_thread = 0; //current thread index in the threads list
+///------------------------------ Global vars--------------------------------------------------------------------------
+//int current_thread = 0; //current thread index in the threads list
 int creations = 0; //0-MAX, counter of the creations of threads
 Thread * threads[MAX_THREAD_NUM]; //threads list
 std::deque<Tread*> ready_queue; // ready threads queue
@@ -145,6 +144,17 @@ int helper_spawn() {
  * itself or the main thread is terminated, the function does not return.
 */
 int uthread_terminate(int tid) {
+    if(threads[tid] == nullptr) {
+        std::cerr << NO_THREAD << std::endl;
+        return FAIL;
+    }
+
+    if(tid == 0) {
+        std::cerr << NO_THREAD << std::endl;
+        return FAIL;
+    }
+    /////////////////////////////////////////////////////////////////////////
+
 }
 
 /**
