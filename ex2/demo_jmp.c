@@ -4,12 +4,7 @@
  * Author: OS, os@cs.huji.ac.il
  */
 
-#include <stdio.h>
-#include <setjmp.h>
-#include <signal.h>
-#include <unistd.h>
-#include <sys/time.h>
-#include <stdbool.h>
+
 
 
 #ifdef __x86_64__

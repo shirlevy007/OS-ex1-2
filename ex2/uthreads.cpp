@@ -1,6 +1,16 @@
 
+#include <stdio.h>
+#include <signal.h>
 #include <csetjmp>
 #include <uthreads.h>
+#include <deque>
+#include <csignal>
+#include <unistd.h>
+#include <setjmp.h>
+#include <unistd.h>
+#include <sys/time.h>
+#include <stdbool.h>
+#include <iostream>
 
 //#define MAX_THREAD_NUM 100 /* maximal number of threads */
 //#define STACK_SIZE 4096 /* stack size per thread (in bytes) */
@@ -9,15 +19,27 @@
 //typedef void (*thread_entry_point)(void);
 typedef unsigned long int address_t;
 
+///--------------------------- system errors -----------------------------
 
-#define INVALID_QUANTUM ("invalid input: quantum_usecs should be positive")
-#define INVALID_EP ("invalid input: entry_point cannot be null")
-#define ABOVE_MAX ("invalid: creation of too many threads")
-#define NO_THREAD ("invalid: no thread with this tid")
+#define INVALID_ALLOC ("system error: memory allocation failed")
+#define SIGACTION_FAILED ("system error: sigaction error")
+#define SET_TIMER_FAILED ("system error: set timer error")
+
+
+///--------------------------- thread library errors -----------------------------
+#define INVALID_QUANTUM ("thread library error: invalid input: quantum_usecs should be positive")
+#define INVALID_EP ("thread library error: invalid input: entry_point cannot be null")
+#define ABOVE_MAX ("thread library error: invalid: creation of too many threads")
+#define ABOVE_MAX ("thread library error: invalid: creation of too many threads")
+#define NO_THREAD ("thread library error: invalid: no thread with tid as requested")
 #define FAIL (-1)
 
-enum States {
+enum State {
     READY, RUNNING, BLOCKED
+};
+
+enum SigCase {
+    SIGSLEEP=27, SIGTERMINATE
 };
 
 /* A translation is required when using an address of a variable.
@@ -32,14 +54,13 @@ address_t translate_address(address_t addr) {
 }
 
 //TODO: MAKE SURE ITS OK:
-
-class Tread {
+class Thread {
 
   unsigned int tid;
   unsigned int quantum;
   char *stack;
   thread_entry_point entry_point;
-  States state;
+  State state;
   sigjmp_buf env;
   address_t sp;
   address_t pc;
@@ -48,33 +69,75 @@ class Tread {
 //    Thread(){
 //        Thread(0,0,std::nullptr_t);
 //    }
-    Thread(int tid, void *stack, thread_entry_point entry_point) {
-      this->tid = thread_count++;
-      this->stack = stack;
-      this->entry_point = entry_point;
-      this->state = READY;
-
-      //from setup
+    Thread(int tid, thread_entry_point entry_point) {
+        this->tid = tid;
+        this->entry_point = entry_point;
+        this->state = READY;
+        this->stack = new char[STACK_SIZE];
+        valid_allocation();
+    }
+    bool valid_allocation(){
+        if (this->stack == nullptr){
+            std::cerr << INVALID_ALLOC << std::endl;
+            exit(1);
+        }
+    }
+    int setup_thread(){
       this->sp = (address_t) stack + STACK_SIZE - sizeof(address_t);
       this->pc = (address_t) entry_point;
-      sigsetjmp(env[tid], 1);
+      sigsetjmp(env, 1);
 //      (env[tid]->__jmpbuf)[JB_SP] = translate_address(sp);
 //      (env[tid]->__jmpbuf)[JB_PC] = translate_address(pc);
-      sigemptyset(&env[tid]->__saved_mask);
-
-  }
-  ~Thread(){
+      sigemptyset(&env[tid].__saved_mask);
+    }
+    ~Thread(){
       delete[] stack;
-  }
+    }
+    State get_state(){
+        return this->state;
+    }
+    unsigned int get_tid(){
+        return this->tid;
+    }
+
 };
 
 ///------------------------------------------- Global vars-------------------------------------------------------
 //int current_thread = 0; //current thread index in the threads list
 int creations = 0; //0-MAX, counter of the creations of threads
 Thread * threads[MAX_THREAD_NUM]; //threads list
-std::deque<Tread*> ready_queue; // ready threads queue
+std::deque<Thread*> ready_queue; // ready threads queue
+int quantum; // the quantum for the timer
+struct itimerval timer;
+Thread * running_thread;
 
 
+void timer_handler(int sig)
+{
+    switch (sig) {
+        case SIGVTALRM: // timer expires
+            ready_queue.push_back(running_thread);
+//            running_thread = (Thread *) ready_queue.
+            break;
+        case SIGSLEEP: // thread blocked
+            break;
+        case SIGTERMINATE: // termination of thread
+            break;
+
+    }
+
+
+
+    timer.it_value.tv_sec = quantum;        // first time interval, seconds part
+    timer.it_value.tv_usec = 0;        // first time interval, microseconds part
+    if (setitimer(ITIMER_VIRTUAL, &timer, NULL))
+    {
+        std::cerr << SET_TIMER_FAILED << std::endl;
+        exit(1);
+    }
+}
+
+///------------------------------------------- Library-------------------------------------------------------
 /**
  * @brief initializes the thread library.
  *
@@ -87,15 +150,38 @@ std::deque<Tread*> ready_queue; // ready threads queue
  *
  * @return On success, return 0. On failure, return -1.
 */
+
 int uthread_init(int quantum_usecs) {
-  if(quantum_usecs <= 0) {
+    if(quantum_usecs <= 0) {
     std::cerr << INVALID_QUANTUM << std::endl;
     return FAIL;
-  }
-  //TODO: FINISHHHH
+    }
 
 
-//  setup_thread(0, stack0, thread0);
+    //TODO: understand how to initialize main thread
+
+    quantum = quantum_usecs;
+    struct sigaction sa = {0};
+    sa.sa_handler = &timer_handler;
+    if (sigaction(SIGVTALRM, &sa, NULL) < 0) {
+        std::cerr << SIGACTION_FAILED << std::endl;
+        exit(1);
+    }
+    // Configure the timer to expire after quantum_usecs... */
+    timer.it_value.tv_sec = 0;        // first time interval, seconds part
+    timer.it_value.tv_usec = quantum_usecs;        // first time interval, microseconds part
+    // configure the timer to expire every quantum_usecs sec after that.
+    timer.it_interval.tv_sec = 0;    // following time intervals, seconds part
+    timer.it_interval.tv_usec = quantum_usecs;    // following time intervals, microseconds part
+
+    // Start a virtual timer. It counts down whenever this process is executing.
+    if (setitimer(ITIMER_VIRTUAL, &timer, NULL)) {
+        std::cerr << SET_TIMER_FAILED << std::endl;
+        exit(1);
+    }
+
+
+
 }
 
 ///----------------------------------------------------------------------------
@@ -123,7 +209,7 @@ int uthread_spawn(thread_entry_point entry_point) {
     return FAIL;
   }
   // entry_point is valid, and there is an available spot in the threads list
-  Thread t = new Thread(tid, entry_point);
+  Thread * t = new Thread(tid, entry_point);
   threads[tid] = t; // adds to our threads list
   creations++; // adds the counter of threads in the threads list
   ready_queue.push_back(t); // adds the thread to the back of the ready queue
@@ -152,17 +238,41 @@ int helper_spawn() {
  * itself or the main thread is terminated, the function does not return.
 */
 int uthread_terminate(int tid) {
-    if(threads[tid] == nullptr) {
+    if(tid<0 || tid>=MAX_THREAD_NUM || threads[tid] == nullptr) {
         std::cerr << NO_THREAD << std::endl;
         return FAIL;
     }
+    if(tid != 0) {
+        if (threads[tid]->get_state()== RUNNING){ // a running thread terminates itself
+            terminate_thread(tid);
+            //TODO: from scheduler - change to next thread. see if to move forward to next thread
+        }
+        ///TODO: when blocked or when ready - different? remove from queue?
+//        if (threads[tid]->get_state()== READY){
+//            terminate_thread(tid);
+//            return 0;
+//        }
+//        if (threads[tid]->get_state()== BLOCKED){
+//            terminate_thread(tid);
+//            return 0;
+//        }
 
-    if(tid == 0) {
-        std::cerr << NO_THREAD << std::endl;
-        return FAIL;
+        terminate_thread(tid);
+        return 0;
     }
-    /////////////////////////////////////////////////////////////////////////
+    for (int i = 1; i < MAX_THREAD_NUM; ++i) {
+        if(threads[i] != nullptr) {
+            terminate_thread(i);
+        }
+    }
+    terminate_thread(0);
+    exit(0);
+}
 
+int terminate_thread(int tid){
+    delete threads[tid];
+    threads[tid] = nullptr;
+    creations--;
 }
 
 /**
@@ -210,6 +320,7 @@ int uthread_sleep(int num_quantums) {
  * @return The ID of the calling thread.
 */
 int uthread_get_tid() {
+    return running_thread->get_tid();
 }
 
 /**

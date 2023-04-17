@@ -10,19 +10,29 @@
 
 
 int gotit = 0;
+int i=1;
+struct itimerval timer;
+
 
 
 void timer_handler(int sig)
 {
     gotit = 1;
     printf("Timer expired\n");
+    timer.it_value.tv_sec = 2 + i;        // first time interval, seconds part
+    i++;
+    timer.it_value.tv_usec = 0;        // first time interval, microseconds part
+    if (setitimer(ITIMER_VIRTUAL, &timer, NULL))
+    {
+        printf("setitimer error.");
+    }
 }
 
 
 int main(void)
 {
     struct sigaction sa = {0};
-    struct itimerval timer;
+//    struct itimerval timer;
 
     // Install timer_handler as the signal handler for SIGVTALRM.
     sa.sa_handler = &timer_handler;
@@ -32,7 +42,7 @@ int main(void)
     }
 
     // Configure the timer to expire after 1 sec... */
-    timer.it_value.tv_sec = 1;        // first time interval, seconds part
+    timer.it_value.tv_sec = 2;        // first time interval, seconds part
     timer.it_value.tv_usec = 0;        // first time interval, microseconds part
 
     // configure the timer to expire every 3 sec after that.
