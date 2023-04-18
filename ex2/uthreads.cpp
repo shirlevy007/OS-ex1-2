@@ -11,6 +11,7 @@
 #include <sys/time.h>
 #include <stdbool.h>
 #include <iostream>
+#include <set>
 
 //#define MAX_THREAD_NUM 100 /* maximal number of threads */
 //#define STACK_SIZE 4096 /* stack size per thread (in bytes) */
@@ -58,6 +59,7 @@ class Thread {
 
   unsigned int tid;
   unsigned int quantum;
+  unsigned int sleep_quantums;
   char *stack;
   thread_entry_point entry_point;
   State state;
@@ -66,15 +68,24 @@ class Thread {
   address_t pc;
 
  public:
-//    Thread(){
-//        Thread(0,0,std::nullptr_t);
-//    }
+    Thread() { // defoult constructor only for main thread.
+        this->tid = 0; // as in instructions
+        this->entry_point = nullptr; // main thread has no function
+        this->state = READY;
+        this->stack = new char[STACK_SIZE];
+        valid_allocation();
+        this->quantum=0;
+        this->sleep_quantums=0;
+    }
+
     Thread(int tid, thread_entry_point entry_point) {
         this->tid = tid;
         this->entry_point = entry_point;
         this->state = READY;
         this->stack = new char[STACK_SIZE];
         valid_allocation();
+        this->quantum=0;
+        this->sleep_quantums=0;
     }
     bool valid_allocation(){
         if (this->stack == nullptr){
@@ -93,8 +104,20 @@ class Thread {
     ~Thread(){
       delete[] stack;
     }
+    void set_state(State s){
+        this->state = s;
+    }
     State get_state(){
         return this->state;
+    }
+    void set_sleep_quantums(unsigned int sq){
+        this->sleep_quantums = sq;
+    }
+    unsigned int decrease_sleep_quantums(){
+        return --this->sleep_quantums;
+    }
+    unsigned int get_sleep_quantums(){
+        return this->sleep_quantums;
     }
     unsigned int get_tid(){
         return this->tid;
@@ -107,35 +130,69 @@ class Thread {
 int creations = 0; //0-MAX, counter of the creations of threads
 Thread * threads[MAX_THREAD_NUM]; //threads list
 std::deque<Thread*> ready_queue; // ready threads queue
+std::set<Thread*> sleeping; // ready threads queue
 int quantum; // the quantum for the timer
 struct itimerval timer;
 Thread * running_thread;
 
 
-void timer_handler(int sig)
-{
-    switch (sig) {
-        case SIGVTALRM: // timer expires
-            ready_queue.push_back(running_thread);
-//            running_thread = (Thread *) ready_queue.
-            break;
-        case SIGSLEEP: // thread blocked
-            break;
-        case SIGTERMINATE: // termination of thread
-            break;
 
-    }
+void restart_timer(){
+    // Configure the timer to expire after quantum_usecs. seconds set as 0 already from global */
+    timer.it_value.tv_usec = quantum;        // first time interval, microseconds part
+    // configure the timer to expire every quantum_usecs sec after that.
+    timer.it_interval.tv_usec = quantum;    // following time intervals, microseconds part
 
-
-
-    timer.it_value.tv_sec = quantum;        // first time interval, seconds part
-    timer.it_value.tv_usec = 0;        // first time interval, microseconds part
-    if (setitimer(ITIMER_VIRTUAL, &timer, NULL))
-    {
+    // Start a virtual timer. It counts down whenever this process is executing.
+    if (setitimer(ITIMER_VIRTUAL, &timer, NULL)) {
         std::cerr << SET_TIMER_FAILED << std::endl;
         exit(1);
     }
 }
+
+void timer_handler(int sig)
+{
+    switch (sig) {
+        case SIGVTALRM: // timer expires
+            ready_queue.push_back(running_thread); // move the last running thread to end of ready list
+            running_thread->set_state(READY);
+
+            // checking sleeping list
+            for (auto blocked: sleeping){
+                if(!blocked->decrease_sleep_quantums()){ //decreases the sleep quantums by 1, return the remaining.
+                    // sleep_quantums=0 so done waiting
+                    if (blocked->get_state()!=BLOCKED){
+                        ready_queue.push_back(blocked); // means sleep_quantums is 0 & not blocked
+                        sleeping.erase(blocked); // TODO: problem to delete while running in a loop?
+                    }
+                }
+            }
+
+
+            running_thread = ready_queue.front(); // move the first thread in ready line up to running state
+            running_thread->set_state(RUNNING);
+            ready_queue.pop_front();
+            break;
+        case SIGSLEEP: // thread blocked
+
+
+
+            restart_timer();
+            break;
+        case SIGTERMINATE: // termination of thread
+
+
+
+            restart_timer();
+            break;
+
+    }
+
+
+
+    restart_timer();
+}
+
 
 ///------------------------------------------- Library-------------------------------------------------------
 /**
@@ -164,24 +221,10 @@ int uthread_init(int quantum_usecs) {
     struct sigaction sa = {0};
     sa.sa_handler = &timer_handler;
     if (sigaction(SIGVTALRM, &sa, NULL) < 0) {
-        std::cerr << SIGACTION_FAILED << std::endl;
+        std::cerr << SIGACTION_FAILED << std::endl; // sigaction failed
         exit(1);
     }
-    // Configure the timer to expire after quantum_usecs... */
-    timer.it_value.tv_sec = 0;        // first time interval, seconds part
-    timer.it_value.tv_usec = quantum_usecs;        // first time interval, microseconds part
-    // configure the timer to expire every quantum_usecs sec after that.
-    timer.it_interval.tv_sec = 0;    // following time intervals, seconds part
-    timer.it_interval.tv_usec = quantum_usecs;    // following time intervals, microseconds part
-
-    // Start a virtual timer. It counts down whenever this process is executing.
-    if (setitimer(ITIMER_VIRTUAL, &timer, NULL)) {
-        std::cerr << SET_TIMER_FAILED << std::endl;
-        exit(1);
-    }
-
-
-
+    restart_timer();
 }
 
 ///----------------------------------------------------------------------------
