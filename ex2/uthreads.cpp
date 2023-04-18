@@ -402,6 +402,14 @@ bool block_by_state(State s, Thread *thread_to_block) {
  * @return On success, return 0. On failure, return -1.
 */
 int uthread_resume(int tid) {
+    if(tid<0 || tid>=MAX_THREAD_NUM || threads[tid] == nullptr) {
+        std::cerr << NO_THREAD << std::endl;
+        return FAIL;
+    }
+    if(threads[tid]->get_state()==BLOCKED){
+        threads[tid]->set_state(READY); //still sleeping until next experation of timer
+    }
+    return 0;
 }
 
 /**
