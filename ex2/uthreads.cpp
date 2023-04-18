@@ -345,36 +345,48 @@ int uthread_block(int tid) {
         std::cerr << NO_BLOCKING_MAIN << std::endl;
         return FAIL;
     }
+    //blocks the thread according to instructions by it's state.
     if (block_by_state(threads[tid]->get_state(), threads[tid])){
         return 0;
     }
     return FAIL;
-    if (threads[tid]->get_state()==BLOCKED){
-        ///Blocking a thread in BLOCKED state has no effect and is not considered an error
-        return 0;
-    }
-    if (threads[tid]->get_state()==READY){
 
-    }
 }
 
+/**
+ *
+ * @param s state of the thread meant to be blocked
+ * @param thread_to_block  a pointer to the thread meant to be blocked
+ * @return true if blocking was successful, otherwise false
+ */
 bool block_by_state(State s, Thread *thread_to_block) {
     switch (s) {
         case BLOCKED:
             return true;
 
         case RUNNING:
-            if(thread_to_block == running_thread){
-                //make sure no RUNNING thread except running_thread
-                /////////////////////////////////////////////////// todo:make sure no need for this check in the end
-                std::cerr << "more than one thread running" << std::endl;
-                return FAIL;
-            }
+//            if(thread_to_block == running_thread){
+//                //make sure no RUNNING thread except running_thread
+//                /////////////////////////////////////////////////// todo:make sure no need for this check in the end
+//                std::cerr << "more than one thread running" << std::endl;
+//                return FAIL;
+//            }
             ///a scheduling decision should be made
             //TODO: scheduling decision
             break;
 
         case READY:
+            int index_in_queue;
+            // find the index of the thread we want to block in the ready_queue
+            for (int i = 0; i < ready_queue.size(); ++i) {
+                if (ready_queue.at(i)->get_tid()==thread_to_block->get_tid()){
+                    index_in_queue = i;
+                    break;
+                }
+            }
+            thread_to_block->set_state(BLOCKED); // set state to blocked
+            sleeping.insert(thread_to_block); // add to sleeping set
+            ready_queue.erase(ready_queue.begin()+index_in_queue); // erase the thread from ready list
             break;
     }
     return false;
