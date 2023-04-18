@@ -33,6 +33,7 @@ typedef unsigned long int address_t;
 #define ABOVE_MAX ("thread library error: invalid: creation of too many threads")
 #define ABOVE_MAX ("thread library error: invalid: creation of too many threads")
 #define NO_THREAD ("thread library error: invalid: no thread with tid as requested")
+#define NO_BLOCKING_MAIN ("thread library error: blocking main thread is invalid")
 #define FAIL (-1)
 
 enum State {
@@ -53,6 +54,8 @@ address_t translate_address(address_t addr) {
   : "0" (addr));
   return ret;
 }
+
+///------------------------------------------- Thread ------------------------------------------------------
 
 //TODO: MAKE SURE ITS OK:
 class Thread {
@@ -125,7 +128,7 @@ class Thread {
 
 };
 
-///------------------------------------------- Global vars-------------------------------------------------------
+///------------------------------------------- Global vars -------------------------------------------------------
 //int current_thread = 0; //current thread index in the threads list
 int creations = 0; //0-MAX, counter of the creations of threads
 Thread * threads[MAX_THREAD_NUM]; //threads list
@@ -133,9 +136,15 @@ std::deque<Thread*> ready_queue; // ready threads queue
 std::set<Thread*> sleeping; // ready threads queue
 int quantum; // the quantum for the timer
 struct itimerval timer;
+
+bool block_by_state(State s);
+
+bool block_by_state(State state, Thread *pThread);
+
 Thread * running_thread;
 
 
+///------------------------------------------- Timer -------------------------------------------------------
 
 void restart_timer(){
     // Configure the timer to expire after quantum_usecs. seconds set as 0 already from global */
@@ -214,6 +223,7 @@ int uthread_init(int quantum_usecs) {
     }
 
 
+    Thread * main = new Thread();
     //TODO: understand how to initialize main thread
 
     quantum = quantum_usecs;
@@ -327,7 +337,49 @@ int terminate_thread(int tid){
  * @return On success, return 0. On failure, return -1.
 */
 int uthread_block(int tid) {
+    if(tid<0 || tid>=MAX_THREAD_NUM || threads[tid] == nullptr) {
+        std::cerr << NO_THREAD << std::endl;
+        return FAIL;
+    }
+    if(tid==0) {
+        std::cerr << NO_BLOCKING_MAIN << std::endl;
+        return FAIL;
+    }
+    if (block_by_state(threads[tid]->get_state(), threads[tid])){
+        return 0;
+    }
+    return FAIL;
+    if (threads[tid]->get_state()==BLOCKED){
+        ///Blocking a thread in BLOCKED state has no effect and is not considered an error
+        return 0;
+    }
+    if (threads[tid]->get_state()==READY){
+
+    }
 }
+
+bool block_by_state(State s, Thread *thread_to_block) {
+    switch (s) {
+        case BLOCKED:
+            return true;
+
+        case RUNNING:
+            if(thread_to_block == running_thread){
+                //make sure no RUNNING thread except running_thread
+                /////////////////////////////////////////////////// todo:make sure no need for this check in the end
+                std::cerr << "more than one thread running" << std::endl;
+                return FAIL;
+            }
+            ///a scheduling decision should be made
+            //TODO: scheduling decision
+            break;
+
+        case READY:
+            break;
+    }
+    return false;
+}
+
 
 /**
  * @brief Resumes a blocked thread with ID tid and moves it to the READY state.

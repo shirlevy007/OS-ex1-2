@@ -6,7 +6,6 @@
 
 
 
-
 #ifdef __x86_64__
 /* code for 64 bit Intel arch */
 
