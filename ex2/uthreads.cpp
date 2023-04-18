@@ -150,6 +150,19 @@ void restart_timer(){
     }
 }
 
+void check_sleep_list(){
+    // checking sleeping list for unblocked thread which are sone waiting
+    for (Thread * blocked: sleeping){
+        if(!blocked->decrease_sleep_quantums()){ //decreases the sleep quantums by 1, return the remaining.
+            // sleep_quantums=0 so done waiting
+            if (blocked->get_state()!=BLOCKED){
+                ready_queue.push_back(blocked); // means sleep_quantums is 0 & not blocked
+                sleeping.erase(blocked); // TODO: problem to delete while running in a loop?
+            }
+        }
+    }
+}
+
 void timer_handler(int sig)
 {
     switch (sig) {
@@ -158,38 +171,24 @@ void timer_handler(int sig)
             running_thread->set_state(READY);
 
             // checking sleeping list
-            for (auto blocked: sleeping){
-                if(!blocked->decrease_sleep_quantums()){ //decreases the sleep quantums by 1, return the remaining.
-                    // sleep_quantums=0 so done waiting
-                    if (blocked->get_state()!=BLOCKED){
-                        ready_queue.push_back(blocked); // means sleep_quantums is 0 & not blocked
-                        sleeping.erase(blocked); // TODO: problem to delete while running in a loop?
-                    }
-                }
-            }
+            check_sleep_list();
 
-
-            running_thread = ready_queue.front(); // move the first thread in ready line up to running state
-            running_thread->set_state(RUNNING);
-            ready_queue.pop_front();
             break;
+
         case SIGSLEEP: // thread blocked
-
-
-
-            restart_timer();
+            sleeping.insert(running_thread); //TODO: make sure there is sleeping quantum and\or blocked state
+//            restart_timer();
             break;
+
         case SIGTERMINATE: // termination of thread
 
-
-
-            restart_timer();
+//            restart_timer();
             break;
 
     }
-
-
-
+    running_thread = ready_queue.front(); // move the first thread in ready line up to running state
+    running_thread->set_state(RUNNING);
+    ready_queue.pop_front();
     restart_timer();
 }
 
