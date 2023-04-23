@@ -101,18 +101,17 @@ typedef unsigned int address_t;
 
 //TODO: MAKE SURE ITS OK:
 class Thread {
-
-  unsigned int tid;
-  int running_quantums;
-  unsigned int sleep_quantums;
-  char *stack;
-  thread_entry_point entry_point;
-  State state;
+    unsigned int tid;
+    int running_quantums;
+    unsigned int sleep_quantums;
+    char *stack;
+    thread_entry_point entry_point;
+    State state;
 //  address_t sp;
 //  address_t pc;
 
  public:
-  sigjmp_buf env;
+    sigjmp_buf env;
 
     Thread() { // defoult constructor only for main thread.
         this->tid = 0; // as in instructions
@@ -237,6 +236,7 @@ void restart_timer(){
     }
 }
 
+//currently not using it. moved to use switch_running_thread_object
 bool saving_the_running_thread(){
     int res = sigsetjmp(running_thread->env, 1);
     if (res == EXIT_FAIL){
@@ -250,43 +250,89 @@ bool saving_the_running_thread(){
     return false;
 }
 
+void switch_running_thread_object() {
+    int next_tid = ready_queue[0]->get_tid();
+    ready_queue.erase(ready_queue.begin());
+    running_thread = threads[next_tid];
+    running_thread->set_state(RUNNING);
+    running_thread->increase_running_quantum();
+    total_quantums++;
+}
 
-void timer_handler(int sig)
-{
+bool switch_threads(unsigned int prev_tid) {
+    int ret_val = sigsetjmp(threads[prev_tid]->env, 1);
+    bool did_just_save_bookmark = (ret_val == 0);
+    printf("Thread is: %d\n", did_just_save_bookmark);
+    return did_just_save_bookmark;
+//        siglongjmp(threads[next_tid]->env, 1);
+    }
+
+
+
+void timer_handler(int sig) {
+    BLOCK_SIG_FUNC;
     switch (sig) {
-        case SIGVTALRM: // timer expires
-            if(saving_the_running_thread()) {
-                return;
-            }
-            ready_queue.push_back(running_thread); // move the last running thread to end of ready list
-            ready_queue.back()->set_state(READY);
-            // setjump - to save the last running, updating to nullptr.
-            break;
+        case SIGVTALRM: {
+//            if(saving_the_running_thread()) {
+//                return;
+//            }
+                if (!ready_queue.empty()) {
+                Thread *prev_thread = running_thread;
+                    switch_running_thread_object();
 
+                ready_queue.push_back(prev_thread);
+                threads[prev_thread->get_tid()]->set_state(READY);
+                UNBLOCK_SIG_FUNC;
+                if (switch_threads(prev_thread->get_tid())) {
+                    siglongjmp(running_thread->env, 1); // we saved the last running thread env, updated the next running thread.
+                }
+            }
+            break;
+        }
+
+//        case SIGVTALRM: // timer expires
+//            if (saving_the_running_thread()) {
+//                return;
+//            }
+//            ready_queue.push_back(running_thread); // move the last running thread to end of ready list
+//            ready_queue.back()->set_state(READY);
+//            // setjump - to save the last running, updating to nullptr.
+//            break;
         case SIGSLEEP: // thread blocked or sleeping
-            if(saving_the_running_thread()) {
-                return;
-            }
+        {
+            //            if(saving_the_running_thread()) {
+//                return;
+//            }
             sleeping.insert(running_thread); //TODO: make sure there is sleeping quantum and\or blocked state
-            sigsetjmp(running_thread->env, 1);
+            Thread *prev_thread = running_thread;
+            switch_running_thread_object();
+            threads[prev_thread->get_tid()]->set_state(READY);
+            UNBLOCK_SIG_FUNC;
+            if (switch_threads(prev_thread->get_tid())) {
+                siglongjmp(running_thread->env, 1); // we saved the last running thread env, updated the next running thread.
+            }
             break;
-
+        }
 
         case SIGTERMINATE: // termination of thread
             running_thread = nullptr;
+            Thread *prev_thread = running_thread;
+            UNBLOCK_SIG_FUNC;
+            if (switch_threads(prev_thread->get_tid())) {
+                siglongjmp(running_thread->env, 1); // we saved the last running thread env, updated the next running thread.
+            }
             break;
 
-    } //prev running thread is last at ready_queue\ sleeping set\ terminated.
+    }
     check_sleep_list(); // checking sleeping list
-
-    //updating running thread
-    running_thread = ready_queue.front(); // move the first thread in ready line up to running state
-    running_thread->set_state(RUNNING);
-    running_thread->increase_running_quantum();
-    ready_queue.pop_front(); //removes from ready queue
-
     restart_timer(); //todo: move up to where a thread is after sigsetjmp?
-    siglongjmp(running_thread->env, 1); // we saved the last running thread env, updated the next running thread.
+
+//    MOVED IT TO switch_running_thread_object FUNCTION
+//    running_thread = ready_queue.front(); // move the first thread in ready line up to running state
+//    running_thread->set_state(RUNNING);
+//    running_thread->increase_running_quantum();
+//    ready_queue.pop_front(); //removes from ready queue
+
 }
 
 /**
@@ -368,6 +414,10 @@ int uthread_init(int quantum_usecs) {
     return EXIT_FAIL;
     }
 
+    sigemptyset(&signal_set);
+    sigaddset(&signal_set, SIGVTALRM);
+
+
     Thread * main = new Thread();
     threads[0] = main;
 
@@ -380,6 +430,7 @@ int uthread_init(int quantum_usecs) {
         std::cerr << SIGACTION_FAILED << std::endl; // sigaction failed
         exit(1);
     }
+    running_thread = threads[0];
     restart_timer();
 }
 
