@@ -264,7 +264,6 @@ bool switch_threads(unsigned int prev_tid) {
     bool did_just_save_bookmark = (ret_val == 0);
     printf("Thread is: %d\n", did_just_save_bookmark);
     return did_just_save_bookmark;
-//        siglongjmp(threads[next_tid]->env, 1);
     }
 
 
