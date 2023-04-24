@@ -631,11 +631,8 @@ void check_swap(){
     uthread_init(1);
     make_threads(2 , thread1_swap_check);
     quantums_to_run(10);
-    printf("Michael 4\n");
-//    printf("uthread_terminate id 0");
-//    printf("Michael 5\n");
-//    uthread_terminate(uthread_get_tid());
-    printf("Michael 6\n");
+    printf("uthread_terminate id 0");
+    uthread_terminate(uthread_get_tid());
 }
 /*
 make thread :  id = 1
@@ -698,15 +695,14 @@ void test_deleting_threads() {
 
 //how to use : uncomment each one of the tests and then make sure the output
 // is the same as the comment above the function
-// by Mor Nahum and Ehud Bartfeld 
+// by Mor Nahum and Ehud Bartfeld
 int main()
 {
-    check_swap();
-    printf("Michael after check_swap function\n");
-//    basic_sleep_check();
-//    basic_block_check();
+    check_swap(); // ok
+//    basic_sleep_check(); // ok
+//    basic_block_check(); // ok
 //    get_limit_error();
-//    check_uthread_get_quantums();
+//    check_uthread_get_quantums(); // ok
 //    check_uthread_terminate();
 //    test_deleting_threads();
 //    delete_and_make_check();

@@ -404,15 +404,15 @@ int test_get_total_quantums ()
 
 int main (int argc, char *argv[])
 {
-//  test_init_errors ();
+//  test_init_errors (); ok
   test_switch ();
-//  test_spawn_errors ();
+//  test_spawn_errors (); ok
 //  test_reallocte_id ();
-//  test_terminate_error ();
-//  test_block_errors ();
+//  test_terminate_error (); ok
+//  test_block_errors (); ok
 //  test_block_and_resume ();
-//  test_resume_errors ();
-//  test_sleep_error ();
+//  test_resume_errors (); ok
+//  test_sleep_error (); ok
 //  test_sleep ();
 //  test_uthread_get_quantums ();
 //  test_get_total_quantums ();
