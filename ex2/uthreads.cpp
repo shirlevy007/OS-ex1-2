@@ -163,7 +163,7 @@ class Thread {
     void setup_thread(){
         address_t sp = (address_t) stack + STACK_SIZE - sizeof(address_t);
         address_t pc = (address_t) entry_point;
-//        sigsetjmp(env, 1);
+        sigsetjmp(env, 1);
         (env->__jmpbuf)[JB_SP] = translate_address(sp);
         (env->__jmpbuf)[JB_PC] = translate_address(pc);
         if (sigemptyset(&env->__saved_mask)== EXIT_FAIL){
@@ -228,15 +228,17 @@ Thread * running_thread;
 
 void check_sleep_list(){
     // checking sleeping list for unblocked thread which are sone waiting
-    Thread * curr = *sleeping.begin();
-    while (curr != *sleeping.end()){
-        if(!curr->decrease_sleep_quantums()){ //decreases the sleep quantums by 1, return the remaining.
+    auto curr = sleeping.begin();
+    while (curr != sleeping.end()){
+        std::cout << "thread " << (*curr)->get_tid() << " state: " << (*curr)->get_state()<< std::endl;
+        if(!(*curr)->decrease_sleep_quantums()){ //decreases the sleep quantums by 1, return the remaining.
             // sleep_quantums=0 so done waiting
-            if (curr->get_state()!=BLOCKED){
-                ready_queue.push_back(curr); // means sleep_quantums is 0 & not blocked
-                sleeping.erase(curr);
+            if ((*curr)->get_state()!=BLOCKED){
+                ready_queue.push_back(*curr); // means sleep_quantums is 0 & not blocked
+                sleeping.erase(*curr);
             }
         }
+        curr++;
     }
 //    for (Thread * blocked: sleeping){
 //        if(!blocked->decrease_sleep_quantums()){ //decreases the sleep quantums by 1, return the remaining.
@@ -250,7 +252,7 @@ void check_sleep_list(){
 }
 
 void restart_timer(){
-//    check_sleep_list(); // checkes blocked list for whenever time expires
+    check_sleep_list(); // checkes blocked list for whenever time expires
 
     // Configure the timer to expire after quantum_usecs. seconds set as 0 already from global */
     timer.it_value.tv_usec = quantum;        // first time interval, microseconds part
@@ -269,10 +271,10 @@ void restart_timer(){
 //currently not using it. moved to use switch_running_thread_object
 bool saving_the_running_thread(){
     int res = sigsetjmp(running_thread->env, 1);
-    if (res < 0){ //when err
-        std::cerr << SIGSET_FAILED << std::endl;
-        exit(1);
-    }
+//    if (res < 0){ //when err
+//        std::cerr << SIGSET_FAILED << std::endl;
+//        exit(1);
+//    }
     if (res==0){ // did just save bookmark - func was called directly
 //        running_thread = nullptr;
         return true;
@@ -291,6 +293,7 @@ void update_running_thread(){
     running_thread->set_state(RUNNING);
     running_thread->increase_running_quantum();
     total_quantums++;
+//    std::cout << "thread " << running_thread->get_tid() << " , " << running_thread->get_running_quantum() << std::endl;
     //    ready_queue.erase(ready_queue.begin()); todo: delete
     ready_queue.pop_front(); //removes from ready queue
 }
@@ -298,6 +301,7 @@ void update_running_thread(){
 
 void timer_handler(int sig)
 {
+    BLOCK_SIG_FUNC();
     switch (sig) {
         case SIGVTALRM: // timer expires
 //            if(saving_the_running_thread()) {
@@ -313,7 +317,7 @@ void timer_handler(int sig)
 //                return;
 //            }
             sleeping.insert(running_thread); //TODO: make sure there is sleeping quantum and\or blocked state
-            sigsetjmp(running_thread->env, 1);
+//            sigsetjmp(running_thread->env, 1);
             break;
 
 
@@ -322,11 +326,18 @@ void timer_handler(int sig)
             break;
 
     } //prev running thread is last at ready_queue\ sleeping set\ terminated.
-    check_sleep_list(); // checking sleeping list
+//    check_sleep_list(); // checking sleeping list
 
-    if(saving_the_running_thread()){ //saves last running thread env.
+    int res = sigsetjmp(running_thread->env, 1);
+    if (res!=0){ // did just save bookmark - func was called directly
+//        running_thread = nullptr;
+        return;
+    }
+    else{
+//    if(saving_the_running_thread()){ //saves last running thread env.
         update_running_thread(); //updating running thread
     }
+    UNBLOCK_SIG_FUNC();
     restart_timer(); //todo: move up to where a thread is after sigsetjmp?
     siglongjmp(running_thread->env, 1); // we saved the last running thread env, updated the next running thread.
 }
@@ -350,7 +361,7 @@ int finds_in_queue(unsigned int tid_to_find){
  * @return a pointer to the thread upon success, otherwise nullptr
  */
 Thread* finds_in_set(unsigned int tid_to_find){
-    for (Thread* t:threads) {
+    for (Thread* t:sleeping) {
         if (t->get_tid()==tid_to_find){
             return t;
         }
@@ -372,6 +383,7 @@ bool block_by_state(State s, Thread *thread_to_block) {
         case RUNNING:
             running_thread->set_state(BLOCKED);
             // a scheduling decision should be made
+//            std::cout << "got here " << std::endl;
             timer_handler(SIGSLEEP);
             return true;
 
