@@ -41,8 +41,26 @@ typedef unsigned long int address_t;
 ///--------------------------- other defines -----------------------------
 #define EXIT_FAIL (-1)
 #define EXIT_SUCCESS (0)
-#define BLOCK_SIG_FUNC sigprocmask(SIG_BLOCK, &signal_set, nullptr)
-#define UNBLOCK_SIG_FUNC sigprocmask(SIG_UNBLOCK, &signal_set, nullptr)
+//#define BLOCK_SIG_FUNC() sigprocmask(SIG_BLOCK, &signal_set, nullptr)
+//#define UNBLOCK_SIG_FUNC() sigprocmask(SIG_UNBLOCK, &signal_set, nullptr)
+
+
+///------------------------------------------- Global vars -------------------------------------------------------
+
+int quantum; // the quantum for the timer
+int total_quantums = 0;
+struct sigaction sa = {0};
+sigset_t signal_set;
+
+///---------------------------------------------------------------------------------------
+
+
+void BLOCK_SIG_FUNC(){
+    sigprocmask(SIG_BLOCK, &signal_set, nullptr);
+}
+void UNBLOCK_SIG_FUNC(){
+    sigprocmask(SIG_UNBLOCK, &signal_set, nullptr);
+}
 
 enum State {
     READY, RUNNING, BLOCKED
@@ -96,6 +114,8 @@ typedef unsigned int address_t;
 
 #define SECOND 1000000
 #define STACK_SIZE 4096
+
+
 
 ///------------------------------------------- Thread ------------------------------------------------------
 
@@ -194,13 +214,14 @@ int creations = 0; //0-MAX, counter of the creations of threads
 Thread * threads[MAX_THREAD_NUM]; //threads list
 static std::deque<Thread*> ready_queue;// ready threads queue
 std::set<Thread*> sleeping; // ready threads queue
-int quantum; // the quantum for the timer
+//int quantum; // the quantum for the timer
 struct itimerval timer;
-int total_quantums=0;
+//int total_quantums=0;
 
 Thread * running_thread;
 
-sigset_t signal_set;
+//struct sigaction sa = {0};
+//sigset_t signal_set;
 
 
 ///------------------------------------------- Timer -------------------------------------------------------
@@ -229,13 +250,14 @@ void check_sleep_list(){
 }
 
 void restart_timer(){
-    total_quantums++;
 //    check_sleep_list(); // checkes blocked list for whenever time expires
 
     // Configure the timer to expire after quantum_usecs. seconds set as 0 already from global */
     timer.it_value.tv_usec = quantum;        // first time interval, microseconds part
+    timer.it_value.tv_sec = 0;        // first time interval, microseconds part
     // configure the timer to expire every quantum_usecs sec after that.
-    timer.it_interval.tv_usec = quantum;    // following time intervals, microseconds part
+    timer.it_interval.tv_usec = 0;    // following time intervals, microseconds part
+    timer.it_interval.tv_sec = 0;    // following time intervals, microseconds part
 
     // Start a virtual timer. It counts down whenever this process is executing.
     if (setitimer(ITIMER_VIRTUAL, &timer, nullptr)) {
@@ -268,6 +290,7 @@ void update_running_thread(){
     running_thread = ready_queue.front(); // move the first thread in ready line up to running state
     running_thread->set_state(RUNNING);
     running_thread->increase_running_quantum();
+    total_quantums++;
     //    ready_queue.erase(ready_queue.begin()); todo: delete
     ready_queue.pop_front(); //removes from ready queue
 }
@@ -387,8 +410,8 @@ int uthread_init(int quantum_usecs) {
     return EXIT_FAIL;
     }
 
-    sigemptyset(&signal_set);
-    sigaddset(&signal_set, SIGVTALRM);
+//    sigemptyset(&signal_set);
+//    sigaddset(&signal_set, SIGVTALRM);
 
 
     Thread * main = new Thread();
@@ -397,13 +420,14 @@ int uthread_init(int quantum_usecs) {
     //TODO: understand how to initialize main thread
 
     quantum = quantum_usecs;
-    struct sigaction sa = {0};
+
     sa.sa_handler = &timer_handler;
     if (sigaction(SIGVTALRM, &sa, NULL) < 0) {
         std::cerr << SIGACTION_FAILED << std::endl; // sigaction failed
         exit(1);
     }
     running_thread = threads[0];
+    total_quantums++;
     restart_timer();
 }
 
@@ -429,7 +453,7 @@ int uthread_spawn(thread_entry_point entry_point) {
     std::cerr << ABOVE_MAX << std::endl;
     return EXIT_FAIL;
   }
-  BLOCK_SIG_FUNC;
+  BLOCK_SIG_FUNC();
 
   // entry_point is valid, and there is an available spot in the threads list
   Thread * t = new Thread(tid, entry_point);
@@ -437,7 +461,7 @@ int uthread_spawn(thread_entry_point entry_point) {
   creations++; // adds the counter of threads in the threads list
   ready_queue.push_back(t); // adds the thread to the back of the ready queue
 
-  UNBLOCK_SIG_FUNC;
+  UNBLOCK_SIG_FUNC();
   return tid;
 }
 
@@ -466,7 +490,7 @@ int uthread_terminate(int tid) {
         std::cerr << NO_THREAD << std::endl;
         return EXIT_FAIL;
     }
-    BLOCK_SIG_FUNC;
+    BLOCK_SIG_FUNC();
     if (tid==0){ //main thread
         for (int i = 1; i < MAX_THREAD_NUM; ++i) {
             if(threads[i] != nullptr) {
@@ -479,7 +503,7 @@ int uthread_terminate(int tid) {
     }
     if (threads[tid]->get_state()== RUNNING){ // a running thread terminates itself
         terminate_thread(tid);
-        UNBLOCK_SIG_FUNC;
+        UNBLOCK_SIG_FUNC();
         timer_handler(SIGTERMINATE); //from scheduler - change to next thread. see if to move forward to next thread
     }
     if (threads[tid]->get_state()== READY){
@@ -487,7 +511,7 @@ int uthread_terminate(int tid) {
         if(index_to_teminate>=0){ //not -1
             ready_queue.erase(ready_queue.begin()+ index_to_teminate);
             terminate_thread(tid);
-            UNBLOCK_SIG_FUNC;
+            UNBLOCK_SIG_FUNC();
             return EXIT_SUCCESS;
         }
         EXIT_FAIL;
@@ -497,13 +521,13 @@ int uthread_terminate(int tid) {
         if(to_be_terminated){ //not nullptr
             sleeping.erase(to_be_terminated);
             terminate_thread(tid);
-            UNBLOCK_SIG_FUNC;
+            UNBLOCK_SIG_FUNC();
             return EXIT_SUCCESS;
         }
-        UNBLOCK_SIG_FUNC;
+        UNBLOCK_SIG_FUNC();
         return EXIT_FAIL;
     }
-    UNBLOCK_SIG_FUNC; // todo: more places here?
+    UNBLOCK_SIG_FUNC(); // todo: more places here?
     return EXIT_FAIL;
 
 }
@@ -533,13 +557,13 @@ int uthread_block(int tid) {
         return EXIT_FAIL;
     }
 
-    BLOCK_SIG_FUNC;
+    BLOCK_SIG_FUNC();
     //blocks the thread according to instructions by it's state.
     if (block_by_state(threads[tid]->get_state(), threads[tid])){
-        UNBLOCK_SIG_FUNC;
+        UNBLOCK_SIG_FUNC();
         return EXIT_SUCCESS;
     }
-    UNBLOCK_SIG_FUNC;
+    UNBLOCK_SIG_FUNC();
     return EXIT_FAIL;
 
 }
@@ -557,13 +581,13 @@ int uthread_resume(int tid) {
         std::cerr << NO_THREAD << std::endl;
         return EXIT_FAIL;
     }
-    BLOCK_SIG_FUNC;
+    BLOCK_SIG_FUNC();
 
     if(threads[tid]->get_state()==BLOCKED){
         threads[tid]->set_state(READY); //still sleeping until next experation of timer
     }
 
-    UNBLOCK_SIG_FUNC;
+    UNBLOCK_SIG_FUNC();
     return EXIT_SUCCESS;
 }
 
@@ -587,16 +611,16 @@ int uthread_sleep(int num_quantums) {
         return EXIT_FAIL;
     }
 
-    BLOCK_SIG_FUNC;
+    BLOCK_SIG_FUNC();
 
     running_thread->set_state(READY);
     // by the forum: a thread that is sleeping might have the READY stage as long as it's not running until quantums are over.
     running_thread->set_sleep_quantums(num_quantums);
 
+    UNBLOCK_SIG_FUNC();
     // a scheduling decision should be made.
     timer_handler(SIGSLEEP);
 
-    UNBLOCK_SIG_FUNC;
     return EXIT_SUCCESS;
 }
 
@@ -606,9 +630,9 @@ int uthread_sleep(int num_quantums) {
  * @return The ID of the calling thread.
 */
 int uthread_get_tid() {
-    BLOCK_SIG_FUNC;
+    BLOCK_SIG_FUNC();
     unsigned int tid = running_thread->get_tid();
-    UNBLOCK_SIG_FUNC;
+    UNBLOCK_SIG_FUNC();
     return tid;
 }
 
@@ -622,9 +646,9 @@ int uthread_get_tid() {
 */
 int uthread_get_total_quantums() {
     // the total_quantums increases by 1 whenever restart_timer is called (each time a new quantum starts)
-    BLOCK_SIG_FUNC;
+    BLOCK_SIG_FUNC();
     int tq = total_quantums;
-    UNBLOCK_SIG_FUNC;
+    UNBLOCK_SIG_FUNC();
     return tq;
 }
 
@@ -638,13 +662,14 @@ int uthread_get_total_quantums() {
  * @return On success, return the number of quantums of the thread with ID tid. On failure, return -1.
 */
 int uthread_get_quantums(int tid) {
+    BLOCK_SIG_FUNC();
     if(tid<0 || tid>=MAX_THREAD_NUM || threads[tid] == nullptr) {
         std::cerr << NO_THREAD << std::endl;
+        UNBLOCK_SIG_FUNC();
         return EXIT_FAIL;
     }
-    BLOCK_SIG_FUNC;
     int tq = threads[tid]->get_running_quantum();
-    UNBLOCK_SIG_FUNC;
+    UNBLOCK_SIG_FUNC();
     return tq;
 }
 
