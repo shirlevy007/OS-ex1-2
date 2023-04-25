@@ -271,23 +271,6 @@ void restart_timer(){
     }
 }
 
-//currently not using it. moved to use switch_running_thread_object
-bool saving_the_running_thread(){
-    int res = sigsetjmp(running_thread->env, 1);
-//    if (res < 0){ //when err
-//        std::cerr << SIGSET_FAILED << std::endl;
-//        exit(1);
-//    }
-    if (res==0){ // did just save bookmark - func was called directly
-//        running_thread = nullptr;
-        return true;
-    }
-    return false;
-//    if (res == 1){
-//        return false;
-//    }
-
-}
 void update_running_thread(){
     //    unsigned int next_tid = ready_queue.front()->get_tid(); todo: delete
     //    running_thread = threads[next_tid]; todo: delete
@@ -301,6 +284,16 @@ void update_running_thread(){
     ready_queue.pop_front(); //removes from ready queue
 }
 
+//void saving_the_running_thread(){
+//    int res = sigsetjmp(running_thread->env, 1);
+//    if (res!=0){ // did just save bookmark - func was called directly
+//        return;
+//    }
+//    else{
+//        update_running_thread(); //updating running thread
+//    }
+//}
+
 
 void timer_handler(int sig)
 {
@@ -312,7 +305,7 @@ void timer_handler(int sig)
 //            }
             ready_queue.push_back(running_thread); // move the last running thread to end of ready list
             ready_queue.back()->set_state(READY);
-            // setjump - to save the last running, updating to nullptr.
+//            saving_the_running_thread();
             break;
 
         case SIGSLEEP: // thread blocked or sleeping
@@ -320,12 +313,13 @@ void timer_handler(int sig)
 //                return;
 //            }
             sleeping.insert(running_thread); //TODO: make sure there is sleeping quantum and\or blocked state
-//            sigsetjmp(running_thread->env, 1);
+//            saving_the_running_thread();
             break;
 
 
         case SIGTERMINATE: // termination of thread
             running_thread = nullptr;
+//            update_running_thread();
             break;
 
     } //prev running thread is last at ready_queue\ sleeping set\ terminated.
