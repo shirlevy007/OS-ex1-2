@@ -404,17 +404,17 @@ int test_get_total_quantums ()
 
 int main (int argc, char *argv[])
 {
-//  test_init_errors (); ok
-  test_switch ();
-//  test_spawn_errors (); ok
-//  test_reallocte_id ();
-//  test_terminate_error (); ok
-//  test_block_errors (); ok
-//  test_block_and_resume ();
-//  test_resume_errors (); ok
-//  test_sleep_error (); ok
-//  test_sleep ();
-//  test_uthread_get_quantums ();
-//  test_get_total_quantums ();
+//  test_init_errors (); //ok
+//  test_switch (); //ok
+//  test_spawn_errors (); //ok
+//  test_reallocte_id (); //ok
+//  test_terminate_error (); //ok
+//  test_block_errors (); //ok
+//  test_block_and_resume (); //ok
+//  test_resume_errors (); //ok
+//  test_sleep_error (); //ok
+//  test_sleep (); //ok
+//  test_uthread_get_quantums (); //ok
+  test_get_total_quantums (); //ok
   return 0;
 }

@@ -209,19 +209,11 @@ class Thread {
 
 ///------------------------------------------- Global vars -------------------------------------------------------
 
-//int current_thread = 0; //current thread index in the threads list
-int creations = 0; //0-MAX, counter of the creations of threads
 Thread * threads[MAX_THREAD_NUM]; //threads list
 static std::deque<Thread*> ready_queue;// ready threads queue
 std::set<Thread*> sleeping; // ready threads queue
-//int quantum; // the quantum for the timer
 struct itimerval timer;
-//int total_quantums=0;
-
 Thread * running_thread;
-
-//struct sigaction sa = {0};
-//sigset_t signal_set;
 
 
 ///------------------------------------------- Timer -------------------------------------------------------
@@ -230,8 +222,7 @@ void check_sleep_list(){
     // checking sleeping list for unblocked thread which are sone waiting
     auto curr = sleeping.begin();
     while (curr != sleeping.end()){
-//        std::cout << "thread " << (*curr)->get_tid() << " state: " << (*curr)->get_state()<< std::endl;
-        if (*curr== nullptr){
+        if (*curr== nullptr){ //when erased might create a problem
             break;
         }
         if(!(*curr)->decrease_sleep_quantums()){ //decreases the sleep quantums by 1, return the remaining.
@@ -243,15 +234,6 @@ void check_sleep_list(){
         }
         curr++;
     }
-//    for (Thread * blocked: sleeping){
-//        if(!blocked->decrease_sleep_quantums()){ //decreases the sleep quantums by 1, return the remaining.
-//            // sleep_quantums=0 so done waiting
-//            if (blocked->get_state()!=BLOCKED){
-//                ready_queue.push_back(blocked); // means sleep_quantums is 0 & not blocked
-//                sleeping.erase(blocked); // TODO: problem to delete while running in a loop?
-//            }
-//        }
-//    }
 }
 
 void restart_timer(){
@@ -279,20 +261,8 @@ void update_running_thread(){
     running_thread->set_state(RUNNING);
     running_thread->increase_running_quantum();
     total_quantums++;
-//    std::cout << "thread " << running_thread->get_tid() << " , " << running_thread->get_running_quantum() << std::endl;
-    //    ready_queue.erase(ready_queue.begin()); todo: delete
     ready_queue.pop_front(); //removes from ready queue
 }
-
-//void saving_the_running_thread(){
-//    int res = sigsetjmp(running_thread->env, 1);
-//    if (res!=0){ // did just save bookmark - func was called directly
-//        return;
-//    }
-//    else{
-//        update_running_thread(); //updating running thread
-//    }
-//}
 
 
 void timer_handler(int sig)
@@ -309,21 +279,15 @@ void timer_handler(int sig)
             break;
 
         case SIGSLEEP: // thread blocked or sleeping
-//            if(saving_the_running_thread()) {
-//                return;
-//            }
             sleeping.insert(running_thread); //TODO: make sure there is sleeping quantum and\or blocked state
-//            saving_the_running_thread();
             break;
 
 
         case SIGTERMINATE: // termination of thread
             running_thread = nullptr;
-//            update_running_thread();
             break;
 
     } //prev running thread is last at ready_queue\ sleeping set\ terminated.
-//    check_sleep_list(); // checking sleeping list
     if(running_thread){
         int res = sigsetjmp(running_thread->env, 1);
         if (res!=0){ // did just save bookmark - func was called directly
@@ -382,7 +346,6 @@ bool block_by_state(State s, Thread *thread_to_block) {
         case RUNNING:
             running_thread->set_state(BLOCKED);
             // a scheduling decision should be made
-//            std::cout << "got here " << std::endl;
             timer_handler(SIGSLEEP);
             return true;
 
@@ -469,7 +432,6 @@ int uthread_spawn(thread_entry_point entry_point) {
   // entry_point is valid, and there is an available spot in the threads list
   Thread * t = new Thread(tid, entry_point);
   threads[tid] = t; // adds to our threads list
-  creations++; // adds the counter of threads in the threads list
   ready_queue.push_back(t); // adds the thread to the back of the ready queue
 
   UNBLOCK_SIG_FUNC();
@@ -546,7 +508,6 @@ int uthread_terminate(int tid) {
 int terminate_thread(int tid){
     delete threads[tid];
     threads[tid] = nullptr;
-    creations--;
 }
 
 /**
