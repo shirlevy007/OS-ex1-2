@@ -4,6 +4,7 @@
  **********************************************/
 
 #include <cstdio>
+#include <iostream>
 #include <cstdlib>
 #include "../uthreads.h"
 
@@ -27,16 +28,19 @@ void wait_next_quantum()
 
 void thread1()
 {
+//    std::cout << "infunc thread1 " << uthread_get_tid() << " , " << uthread_get_quantums(uthread_get_tid()) << std::endl;
     uthread_block(uthread_get_tid());
 }
 
 void thread2()
 {
+//    std::cout << "infunc thread2 " << uthread_get_tid() << " , " << uthread_get_quantums(uthread_get_tid()) << std::endl;
     halt();
 }
 
 void error()
 {
+//    std::cout << "infunc thread err " << uthread_get_tid() << " , " << uthread_get_quantums(uthread_get_tid()) << std::endl;
     printf(RED "ERROR - wrong id returned\n" RESET);
     exit(1);
 }
@@ -65,7 +69,7 @@ int main()
     if (uthread_spawn(thread1) != 5)
         error();
 
-    wait_next_quantum();
+       wait_next_quantum();
     wait_next_quantum();
 
     uthread_terminate(5);
