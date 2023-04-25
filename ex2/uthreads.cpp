@@ -230,7 +230,10 @@ void check_sleep_list(){
     // checking sleeping list for unblocked thread which are sone waiting
     auto curr = sleeping.begin();
     while (curr != sleeping.end()){
-        std::cout << "thread " << (*curr)->get_tid() << " state: " << (*curr)->get_state()<< std::endl;
+//        std::cout << "thread " << (*curr)->get_tid() << " state: " << (*curr)->get_state()<< std::endl;
+        if (*curr== nullptr){
+            break;
+        }
         if(!(*curr)->decrease_sleep_quantums()){ //decreases the sleep quantums by 1, return the remaining.
             // sleep_quantums=0 so done waiting
             if ((*curr)->get_state()!=BLOCKED){
@@ -327,15 +330,17 @@ void timer_handler(int sig)
 
     } //prev running thread is last at ready_queue\ sleeping set\ terminated.
 //    check_sleep_list(); // checking sleeping list
-
-    int res = sigsetjmp(running_thread->env, 1);
-    if (res!=0){ // did just save bookmark - func was called directly
-//        running_thread = nullptr;
-        return;
+    if(running_thread){
+        int res = sigsetjmp(running_thread->env, 1);
+        if (res!=0){ // did just save bookmark - func was called directly
+            return;
+        }
+        else{
+            update_running_thread(); //updating running thread
+        }
     }
     else{
-//    if(saving_the_running_thread()){ //saves last running thread env.
-        update_running_thread(); //updating running thread
+        update_running_thread();
     }
     UNBLOCK_SIG_FUNC();
     restart_timer(); //todo: move up to where a thread is after sigsetjmp?

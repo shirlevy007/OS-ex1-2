@@ -698,13 +698,13 @@ void test_deleting_threads() {
 // by Mor Nahum and Ehud Bartfeld
 int main()
 {
-    check_swap(); // ok
-//    basic_sleep_check(); // ok
+//    check_swap(); //ok
+//    basic_sleep_check(); //ok
 //    basic_block_check(); // ok
-//    get_limit_error();
+//    get_limit_error(); // ok
 //    check_uthread_get_quantums(); // ok
-//    check_uthread_terminate();
-//    test_deleting_threads();
+//    check_uthread_terminate(); // ok
+//    test_deleting_threads(); // ok
 //    delete_and_make_check();
     return 0;
 }
