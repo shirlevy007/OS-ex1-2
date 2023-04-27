@@ -16,10 +16,10 @@
 
 //#define MAX_THREAD_NUM 100 /* maximal number of threads */
 //#define STACK_SIZE 4096 /* stack size per thread (in bytes) */
-#define JB_SP 6
-#define JB_PC 7
+//#define JB_SP 6
+//#define JB_PC 7
 //typedef void (*thread_entry_point)(void);
-typedef unsigned long int address_t;
+//typedef unsigned long int address_t;
 
 ///--------------------------- system errors -----------------------------
 
@@ -39,8 +39,8 @@ typedef unsigned long int address_t;
 #define NO_BLOCKING_MAIN ("thread library error - blocking main thread is invalid")
 
 ///--------------------------- other defines -----------------------------
-#define EXIT_FAIL (-1)
-#define EXIT_SUCCESS (0)
+#define FAIL_EXIT (-1)
+#define SUCCESS_EXIT (0)
 //#define BLOCK_SIG_FUNC() sigprocmask(SIG_BLOCK, &signal_set, nullptr)
 //#define UNBLOCK_SIG_FUNC() sigprocmask(SIG_UNBLOCK, &signal_set, nullptr)
 
@@ -170,7 +170,7 @@ class Thread {
         sigsetjmp(env, 1);
         (env->__jmpbuf)[JB_SP] = translate_address(sp);
         (env->__jmpbuf)[JB_PC] = translate_address(pc);
-        if (sigemptyset(&env->__saved_mask)== EXIT_FAIL){
+        if (sigemptyset(&env->__saved_mask) == FAIL_EXIT){
             std::cerr << SIGEMPTYSET_FAILED << std::endl;
             exit(1);
         }
@@ -332,7 +332,7 @@ int finds_in_queue(unsigned int tid_to_find){
             return i;
         }
     }
-    return EXIT_FAIL;
+    return FAIL_EXIT;
 }
 /**
  *
@@ -397,7 +397,7 @@ bool block_by_state(State s, Thread *thread_to_block) {
 int uthread_init(int quantum_usecs) {
     if(quantum_usecs <= 0) {
     std::cerr << INVALID_QUANTUM << std::endl;
-    return EXIT_FAIL;
+    return FAIL_EXIT;
     }
 
     Thread * main = new Thread();
@@ -430,12 +430,12 @@ int uthread_init(int quantum_usecs) {
 int uthread_spawn(thread_entry_point entry_point) {
   if(entry_point == nullptr) {
     std::cerr << INVALID_EP << std::endl;
-    return EXIT_FAIL;
+    return FAIL_EXIT;
   }
   int tid = helper_spawn ();
   if(tid < 0) {
     std::cerr << ABOVE_MAX << std::endl;
-    return EXIT_FAIL;
+    return FAIL_EXIT;
   }
   BLOCK_SIG_FUNC();
 
@@ -459,7 +459,7 @@ int helper_spawn() {
     }
   }
   // no empty spot at the threads list
-  return EXIT_FAIL;
+  return FAIL_EXIT;
 }
 
 /**
@@ -475,7 +475,7 @@ int helper_spawn() {
 int uthread_terminate(int tid) {
     if(tid<0 || tid>=MAX_THREAD_NUM || threads[tid] == nullptr) {
         std::cerr << NO_THREAD << std::endl;
-        return EXIT_FAIL;
+        return FAIL_EXIT;
     }
     BLOCK_SIG_FUNC();
     if (tid==0){ //main thread
@@ -485,7 +485,7 @@ int uthread_terminate(int tid) {
             }
         }
         terminate_thread(0);
-        exit(EXIT_SUCCESS);
+        exit(SUCCESS_EXIT);
     }
     if (threads[tid]->get_state()== RUNNING){ // a running thread terminates itself
         terminate_thread(tid);
@@ -498,9 +498,9 @@ int uthread_terminate(int tid) {
             ready_queue.erase(ready_queue.begin()+ index_to_teminate);
             terminate_thread(tid);
             UNBLOCK_SIG_FUNC();
-            return EXIT_SUCCESS;
+            return SUCCESS_EXIT;
         }
-        EXIT_FAIL;
+        FAIL_EXIT;
     }
     if (threads[tid]->get_state()== BLOCKED){
         Thread * to_be_terminated = finds_in_set(tid);
@@ -508,13 +508,13 @@ int uthread_terminate(int tid) {
             sleeping.erase(to_be_terminated);
             terminate_thread(tid);
             UNBLOCK_SIG_FUNC();
-            return EXIT_SUCCESS;
+            return SUCCESS_EXIT;
         }
         UNBLOCK_SIG_FUNC();
-        return EXIT_FAIL;
+        return FAIL_EXIT;
     }
     UNBLOCK_SIG_FUNC();
-    return EXIT_FAIL;
+    return FAIL_EXIT;
 
 }
 
@@ -535,21 +535,21 @@ int terminate_thread(int tid){
 int uthread_block(int tid) {
     if(tid<0 || tid>=MAX_THREAD_NUM || threads[tid] == nullptr) {
         std::cerr << NO_THREAD << std::endl;
-        return EXIT_FAIL;
+        return FAIL_EXIT;
     }
     if(tid==0) {
         std::cerr << NO_BLOCKING_MAIN << std::endl;
-        return EXIT_FAIL;
+        return FAIL_EXIT;
     }
 
     BLOCK_SIG_FUNC();
     //blocks the thread according to instructions by it's state.
     if (block_by_state(threads[tid]->get_state(), threads[tid])){
         UNBLOCK_SIG_FUNC();
-        return EXIT_SUCCESS;
+        return SUCCESS_EXIT;
     }
     UNBLOCK_SIG_FUNC();
-    return EXIT_FAIL;
+    return FAIL_EXIT;
 
 }
 
@@ -564,7 +564,7 @@ int uthread_block(int tid) {
 int uthread_resume(int tid) {
     if(tid<0 || tid>=MAX_THREAD_NUM || threads[tid] == nullptr) {
         std::cerr << NO_THREAD << std::endl;
-        return EXIT_FAIL;
+        return FAIL_EXIT;
     }
     BLOCK_SIG_FUNC();
 
@@ -573,7 +573,7 @@ int uthread_resume(int tid) {
     }
 
     UNBLOCK_SIG_FUNC();
-    return EXIT_SUCCESS;
+    return SUCCESS_EXIT;
 }
 
 /**
@@ -593,7 +593,7 @@ int uthread_sleep(int num_quantums) {
 
     if(running_thread->get_tid()==0) {
         std::cerr << NO_BLOCKING_MAIN << std::endl;
-        return EXIT_FAIL;
+        return FAIL_EXIT;
     }
 
     BLOCK_SIG_FUNC();
@@ -606,7 +606,7 @@ int uthread_sleep(int num_quantums) {
     // a scheduling decision should be made.
     timer_handler(SIGSLEEP);
 
-    return EXIT_SUCCESS;
+    return SUCCESS_EXIT;
 }
 
 /**
@@ -651,7 +651,7 @@ int uthread_get_quantums(int tid) {
     if(tid<0 || tid>=MAX_THREAD_NUM || threads[tid] == nullptr) {
         std::cerr << NO_THREAD << std::endl;
         UNBLOCK_SIG_FUNC();
-        return EXIT_FAIL;
+        return FAIL_EXIT;
     }
     int tq = threads[tid]->get_running_quantum();
     UNBLOCK_SIG_FUNC();
