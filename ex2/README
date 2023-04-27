@@ -11,6 +11,8 @@ michaelbroid (204906457), shir levy (316419423)
 ##################
 
 README -- answers
+uthreads.cpp -- the code file
+Makefile -- in order to use 'make' on the project
 
 
 
@@ -72,6 +74,8 @@ README -- answers
     process. The OS should handle the interrupt.
 
 5.
-    real time
-    virtual time
-
+    real time is counted by the real amount of seconds and usec that passes in the real
+    world, in contrast to virtual time that is defined as the time required for the  CPU
+    to complete a job as if there were no interruptions.
+    When an alarm is sent to announce a timer finished it's counting, real time timer
+    would send SIGALRM, while virtual time timer would send SIGVTALRM.
