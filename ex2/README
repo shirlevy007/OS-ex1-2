@@ -39,7 +39,7 @@ README -- answers
     b.
     sigsetjmp gets as a param an int, "savings", which whenever is non-zero it saves
     the current signal mask.
-    siglongjmp %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+    siglongjmp gets a saved env to jump to, and a value that sigsetjmp would return.
 
 2.
    User-level threads is a library containing the whole code, but the kernel is not aware
@@ -74,5 +74,4 @@ README -- answers
 5.
     real time
     virtual time
-    %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 

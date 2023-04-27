@@ -119,7 +119,6 @@ typedef unsigned int address_t;
 
 ///------------------------------------------- Thread ------------------------------------------------------
 
-//TODO: MAKE SURE ITS OK:
 class Thread {
     unsigned int tid;
     int running_quantums;
@@ -127,8 +126,6 @@ class Thread {
     char *stack;
     thread_entry_point entry_point;
     State state;
-//  address_t sp;
-//  address_t pc;
 
  public:
     sigjmp_buf env;
@@ -136,7 +133,7 @@ class Thread {
     Thread() { // defoult constructor only for main thread.
         this->tid = 0; // as in instructions
         this->entry_point = nullptr; // main thread has no function
-        this->state = RUNNING;
+        this->state = RUNNING; //main thread is RUNNING upon creation
         this->stack = nullptr; // stack of the main thread will be using the "regular" stack and PC.
         this->running_quantums=1;
         this->sleep_quantums=0;
@@ -153,6 +150,10 @@ class Thread {
         this->sleep_quantums=0;
         setup_thread();
     }
+    /**
+     * checks if allocation went well
+     * @return true if all went well, otherwise exits and prints an error
+     */
     bool valid_allocation(){
         if (this->stack == nullptr){
             std::cerr << INVALID_ALLOC << std::endl;
@@ -160,6 +161,9 @@ class Thread {
         }
         return true;
     }
+    /**
+     * sets up thread's env
+     */
     void setup_thread(){
         address_t sp = (address_t) stack + STACK_SIZE - sizeof(address_t);
         address_t pc = (address_t) entry_point;
@@ -213,11 +217,16 @@ Thread * threads[MAX_THREAD_NUM]; //threads list
 static std::deque<Thread*> ready_queue;// ready threads queue
 std::set<Thread*> sleeping; // ready threads queue
 struct itimerval timer;
-Thread * running_thread;
+Thread * running_thread; // pointer to the running thread
 
 
 ///------------------------------------------- Timer -------------------------------------------------------
 
+/**
+ * goes over the sleeping threads:
+ * decreases sleeping quantum from every thread, and "wakes up" every
+ * unblocked thread that is done sleeping.
+ */
 void check_sleep_list(){
     // checking sleeping list for unblocked thread which are sone waiting
     auto curr = sleeping.begin();
@@ -236,6 +245,10 @@ void check_sleep_list(){
     }
 }
 
+/***
+ * goes over the sleeping threads to update changes
+ * restart the timer.
+ */
 void restart_timer(){
     check_sleep_list(); // checkes blocked list for whenever time expires
 
@@ -253,33 +266,35 @@ void restart_timer(){
     }
 }
 
+/***
+ * takes the first thread in the ready_queue and pops it to be the running
+ * thread
+ */
 void update_running_thread(){
-    //    unsigned int next_tid = ready_queue.front()->get_tid(); todo: delete
-    //    running_thread = threads[next_tid]; todo: delete
-
     running_thread = ready_queue.front(); // move the first thread in ready line up to running state
     running_thread->set_state(RUNNING);
     running_thread->increase_running_quantum();
+  // updates total quantum as we increase the running quantum of the thread.
     total_quantums++;
     ready_queue.pop_front(); //removes from ready queue
 }
 
-
+/***
+ * the Scheduler - handles the timer and switches thread as required
+ * @param sig an int representing the signal which caused restarting the
+ * timer - SIGVTALRM, SIGSLEEP, SIGTERMINATE.
+ */
 void timer_handler(int sig)
 {
     BLOCK_SIG_FUNC();
     switch (sig) {
         case SIGVTALRM: // timer expires
-//            if(saving_the_running_thread()) {
-//                return;
-//            }
             ready_queue.push_back(running_thread); // move the last running thread to end of ready list
             ready_queue.back()->set_state(READY);
-//            saving_the_running_thread();
             break;
 
         case SIGSLEEP: // thread blocked or sleeping
-            sleeping.insert(running_thread); //TODO: make sure there is sleeping quantum and\or blocked state
+            sleeping.insert(running_thread);
             break;
 
 
@@ -287,7 +302,8 @@ void timer_handler(int sig)
             running_thread = nullptr;
             break;
 
-    } //prev running thread is last at ready_queue\ sleeping set\ terminated.
+    }
+    //prev running thread is last at ready_queue\ sleeping set\ terminated.
     if(running_thread){
         int res = sigsetjmp(running_thread->env, 1);
         if (res!=0){ // did just save bookmark - func was called directly
@@ -297,11 +313,11 @@ void timer_handler(int sig)
             update_running_thread(); //updating running thread
         }
     }
-    else{
+    else{ // running thread was terminated, and so - no need to save it's env
         update_running_thread();
     }
     UNBLOCK_SIG_FUNC();
-    restart_timer(); //todo: move up to where a thread is after sigsetjmp?
+    restart_timer();
     siglongjmp(running_thread->env, 1); // we saved the last running thread env, updated the next running thread.
 }
 
@@ -384,14 +400,8 @@ int uthread_init(int quantum_usecs) {
     return EXIT_FAIL;
     }
 
-//    sigemptyset(&signal_set);
-//    sigaddset(&signal_set, SIGVTALRM);
-
-
     Thread * main = new Thread();
     threads[0] = main;
-
-    //TODO: understand how to initialize main thread
 
     quantum = quantum_usecs;
 
@@ -438,6 +448,10 @@ int uthread_spawn(thread_entry_point entry_point) {
   return tid;
 }
 
+/**
+ * fined the smallest index that is empty  in the threads array
+ * @return the index, -1 if none was found
+ */
 int helper_spawn() {
   for(int i = 1; i < MAX_THREAD_NUM; ++i) {
     if(threads[i] == nullptr) {
@@ -469,7 +483,6 @@ int uthread_terminate(int tid) {
             if(threads[i] != nullptr) {
                 terminate_thread(i);
             }
-            // todo: check if to delete ready_queue and sleeping_set
         }
         terminate_thread(0);
         exit(EXIT_SUCCESS);
@@ -500,7 +513,7 @@ int uthread_terminate(int tid) {
         UNBLOCK_SIG_FUNC();
         return EXIT_FAIL;
     }
-    UNBLOCK_SIG_FUNC(); // todo: more places here?
+    UNBLOCK_SIG_FUNC();
     return EXIT_FAIL;
 
 }
