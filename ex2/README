@@ -1,0 +1,81 @@
+michaelbroid, shirlevy
+michaelbroid (204906457), shir levy (316419423)
+
+#################
+##### EX: 2 #####
+#################
+
+
+##################
+##### FILES: #####
+##################
+
+README -- answers
+uthreads.cpp -- the code file
+Makefile -- in order to use 'make' on the project
+
+
+
+####################
+##### REMARKS: #####
+####################
+
+
+####################
+##### ANSWERS: #####
+####################
+
+1.
+    a.
+    sigsetjmp - saves the current state of the thread. It saves the stack context
+    and cpu state i env for later use, saves the current signal mask as well for any
+    "savings" parameter different from 0. The return value is 0 if sigsetjmp was called
+    directly, otherwise, the return value would be as the function which called it
+    assigned.
+    siglongjmp - jumps to an action of a new thread. Jumps to the code location and
+    resture CPU state specified by enc. The jump will take us into the location in the
+    code where the sigsetjmp has been called if the signal mask was saved in sigsetjmp,
+    it will be restored as well. The user-defined parameter val would be the return
+    value of sigsetjmp when arriving fom siglongjmp.
+
+    b.
+    sigsetjmp gets as a param an int, "savings", which whenever is non-zero it saves
+    the current signal mask.
+    siglongjmp gets a saved env to jump to, and a value that sigsetjmp would return.
+
+2.
+   User-level threads is a library containing the whole code, but the kernel is not aware
+   of it. A use of it might be with GUI programming. We can use user-level thread in order
+   to preform long range operations without blocking the main loop that handles the
+   user's input.
+   user-level threads are a reasonable choice for this, as they are easier and faster to
+   create than kernel-level threads, as well as they have no overhead - so the OS runs the
+   least possible. User-level threads can run on any operating system. Also, There are no
+   kernel mode privileges required for thread switching in user-level.
+
+3.
+    Advantages:
+    independence - processes can communicate with one another through the OS.
+    suspension - one process might be suspended, as the others are not affected by that.
+    multiple CPUs - the processes can run parallel on many CPUs.
+
+    Disadvantages:
+    high overhead - the OS runs a lot.
+    dependence in the OS - in order to create new process we need to use the interface of
+    the specific OS.
+
+4.
+    a. application: firefox, PID: 55758
+    b. closed the firefox program
+    c.
+    kill - a signal sent by the OS to the process to kill itself (the process should
+    handle it).
+    keyboard - an external interrupt that triggered the OS to send the kill signal to the
+    process. The OS should handle the interrupt.
+
+5.
+    real time is counted by the real amount of seconds and usec that passes in the real
+    world, in contrast to virtual time that is defined as the time required for the  CPU
+    to complete a job as if there were no interruptions.
+    When an alarm is sent to announce a timer finished it's counting, real time timer
+    would send SIGALRM, while virtual time timer would send SIGVTALRM.
