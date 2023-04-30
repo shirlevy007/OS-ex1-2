@@ -311,7 +311,7 @@ void timer_handler(int sig)
  * @return the index of the tid, -1 upon fail
  */
 int finds_in_queue(unsigned int tid_to_find){
-    for (int i = 0; i < ready_queue.size(); ++i) {
+    for (unsigned long int i = 0; i < ready_queue.size(); ++i) {
         if (ready_queue.at(i)->get_tid() == tid_to_find) {
             return i;
         }
@@ -405,6 +405,17 @@ int uthread_init(int quantum_usecs) {
     restart_timer();
 }
 
+int helper_spawn() {
+    for(int i = 1; i < MAX_THREAD_NUM; ++i) {
+        if(threads[i] == nullptr) {
+            return i;
+        }
+    }
+    // no empty spot at the threads list
+    return EXIT_FAIL;
+}
+
+
 /**
  * @brief Creates a new thread, whose entry point is the function entry_point with the signature
  * void entry_point(void).
@@ -438,14 +449,10 @@ int uthread_spawn(thread_entry_point entry_point) {
   return tid;
 }
 
-int helper_spawn() {
-  for(int i = 1; i < MAX_THREAD_NUM; ++i) {
-    if(threads[i] == nullptr) {
-      return i;
-    }
-  }
-  // no empty spot at the threads list
-  return EXIT_FAIL;
+
+void terminate_thread(int tid){
+    delete threads[tid];
+    threads[tid] = nullptr;
 }
 
 /**
@@ -503,11 +510,6 @@ int uthread_terminate(int tid) {
     UNBLOCK_SIG_FUNC(); // todo: more places here?
     return EXIT_FAIL;
 
-}
-
-int terminate_thread(int tid){
-    delete threads[tid];
-    threads[tid] = nullptr;
 }
 
 /**
