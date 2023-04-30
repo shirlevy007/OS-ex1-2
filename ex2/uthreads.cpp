@@ -171,7 +171,7 @@ class Thread {
         sigsetjmp(env, 1);
         (env->__jmpbuf)[JB_SP] = translate_address(sp);
         (env->__jmpbuf)[JB_PC] = translate_address(pc);
-        if (sigemptyset(&env->__saved_mask)== EXIT_FAIL){
+        if (sigemptyset(&env->__saved_mask)== FAIL_EXIT){
             std::cerr << SIGEMPTYSET_FAILED << std::endl;
             exit(1);
         }
