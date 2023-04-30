@@ -14,12 +14,6 @@
 #include <set>
 #include <queue>
 
-//#define MAX_THREAD_NUM 100 /* maximal number of threads */
-//#define STACK_SIZE 4096 /* stack size per thread (in bytes) */
-//#define JB_SP 6
-//#define JB_PC 7
-//typedef void (*thread_entry_point)(void);
-//typedef unsigned long int address_t;
 
 ///--------------------------- system errors -----------------------------
 
@@ -582,7 +576,7 @@ int uthread_resume(int tid) {
         if(threads[tid]->get_sleep_quantums()==0){ // sleep_quantums==0 & no BLOCKED - so put back in ready_queue
             ready_queue.push_back(threads[tid]);
             sleeping.erase(threads[tid]);
-        } ///todo: make sure this IF
+        }
     }
 
     UNBLOCK_SIG_FUNC();
