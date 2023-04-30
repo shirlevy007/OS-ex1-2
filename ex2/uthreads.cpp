@@ -578,9 +578,9 @@ int uthread_resume(int tid) {
     BLOCK_SIG_FUNC();
 
     if(threads[tid]->get_state()==BLOCKED){
-        threads[tid]->set_state(READY); //still sleeping until next experation of timer
-        if(threads[tid]->get_sleep_quantums()==0){
-            ready_queue.push_back(threads[tid]); // means sleep_quantums is 0 & not blocked
+        threads[tid]->set_state(READY); //if more sleep_quantums - still sleeping until next expiration of timer
+        if(threads[tid]->get_sleep_quantums()==0){ // sleep_quantums==0 & no BLOCKED - so put back in ready_queue
+            ready_queue.push_back(threads[tid]);
             sleeping.erase(threads[tid]);
         } ///todo: make sure this IF
     }
