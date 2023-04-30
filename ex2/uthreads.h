@@ -13,28 +13,7 @@
 
 typedef void (*thread_entry_point)(void);
 
-
 /* External interface */
-
-/**
- * finds an empty spot in ready array
- * @return the tid of the empty spot founded, otherwise -1
- */
-int helper_spawn();
-/**
- * delete cretion and resources of thread in location tid
- * @param tid
- * @return
- */
-int terminate_thread(int tid);
-
-
-/**
- * creates a thread using new Thread
- * @param tid
- * @param entry_point
- */
-void thread_creator(unsigned int tid, thread_entry_point entry_point);
 
 
 /**

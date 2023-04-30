@@ -2,7 +2,7 @@
 #include <stdio.h>
 #include <signal.h>
 #include <csetjmp>
-#include <uthreads.h>
+#include "uthreads.h"
 #include <deque>
 #include <csignal>
 #include <unistd.h>
@@ -406,13 +406,29 @@ int uthread_init(int quantum_usecs) {
     quantum = quantum_usecs;
 
     sa.sa_handler = &timer_handler;
-    if (sigaction(SIGVTALRM, &sa, NULL) < 0) {
+    if (sigaction(SIGVTALRM, &sa, nullptr) < 0) {
         std::cerr << SIGACTION_FAILED << std::endl; // sigaction failed
         exit(1);
     }
     running_thread = threads[0];
     total_quantums++;
     restart_timer();
+    return SUCCESS_EXIT;
+}
+
+
+/**
+ * fined the smallest index that is empty  in the threads array
+ * @return the index, -1 if none was found
+ */
+int helper_spawn() {
+  for(int i = 1; i < MAX_THREAD_NUM; ++i) {
+    if(threads[i] == nullptr) {
+      return i;
+    }
+  }
+  // no empty spot at the threads list
+  return FAIL_EXIT;
 }
 
 /**
@@ -448,19 +464,15 @@ int uthread_spawn(thread_entry_point entry_point) {
   return tid;
 }
 
-/**
- * fined the smallest index that is empty  in the threads array
- * @return the index, -1 if none was found
+/***
+ * deletes all resources of a thread to delete
+ * @param tid of the thread to terminate
  */
-int helper_spawn() {
-  for(int i = 1; i < MAX_THREAD_NUM; ++i) {
-    if(threads[i] == nullptr) {
-      return i;
-    }
-  }
-  // no empty spot at the threads list
-  return FAIL_EXIT;
+void terminate_thread(int tid){
+  delete threads[tid];
+  threads[tid] = nullptr;
 }
+
 
 /**
  * @brief Terminates the thread with ID tid and deletes it from all relevant control structures.
@@ -518,10 +530,6 @@ int uthread_terminate(int tid) {
 
 }
 
-int terminate_thread(int tid){
-    delete threads[tid];
-    threads[tid] = nullptr;
-}
 
 /**
  * @brief Blocks the thread with ID tid. The thread may be resumed later using uthread_resume.

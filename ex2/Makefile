@@ -1,33 +1,61 @@
+#CC=g++
+#CXX=g++
+#RANLIB=ranlib
+#
+#LIBSRC=uthreads.cpp
+#LIBOBJ=$(LIBSRC:.cpp=.o)
+#
+#INCS=-I.
+#CFLAGS = -Wall -std=c++11 -g $(INCS)
+#CXXFLAGS = -Wall -std=c++11 -g $(INCS)
+#
+#LIBUTHREADS = libuthreads.a
+#TARGETS = $(LIBUTHREADS)
+#
+#TAR=tar
+#TARFLAGS=-cvf
+#TARNAME=ex2.tar
+#TARSRCS=$(LIBSRC) Makefile README
+#
+#all: $(TARGETS)
+#
+#$(TARGETS): $(LIBOBJ)
+#	$(AR) $(ARFLAGS) $@ $^
+#	$(RANLIB) $@
+#
+#clean:
+#	$(RM) $(TARGETS) $(LIBUTHREADS) $(OBJ) $(LIBOBJ) *~ *core
+#
+#depend:
+#	makedepend -- $(CFLAGS) -- $(SRC) $(LIBSRC)
+#
+#tar:
+#	$(TAR) $(TARFLAGS) $(TARNAME) $(TARSRCS)
+#
+#
+
 CC=g++
 CXX=g++
-RANLIB=ranlib
+
+LIBNAME=libuthreads.a
 
 LIBSRC=uthreads.cpp
 LIBOBJ=$(LIBSRC:.cpp=.o)
 
-INCS=-I.
 CFLAGS = -Wall -std=c++11 -g $(INCS)
 CXXFLAGS = -Wall -std=c++11 -g $(INCS)
-
-LIBUTHREADS = libuthreads.a
-TARGETS = $(LIBUTHREADS)
 
 TAR=tar
 TARFLAGS=-cvf
 TARNAME=ex2.tar
-TARSRCS=$(LIBSRC) Makefile README
+TARSRCS= $(LIBHT) $(LIBSRC) Makefile README
 
-all: $(TARGETS)
+all: $(LIBNAME)
 
-$(TARGETS): $(LIBOBJ)
-	$(AR) $(ARFLAGS) $@ $^
-	$(RANLIB) $@
-
+$(LIBNAME): $(LIBOBJT) $(LIBOBJ)
+	ar rcs $(LIBNAME) $(LIBOBJT) $(LIBOBJ)
 clean:
-	$(RM) $(TARGETS) $(LIBUTHREADS) $(OBJ) $(LIBOBJ) *~ *core
-
-depend:
-	makedepend -- $(CFLAGS) -- $(SRC) $(LIBSRC)
+	$(RM) $(TARGETS) $(OBJ) $(LIBOBJT) $(LIBOBJ) *~ *core
 
 tar:
 	$(TAR) $(TARFLAGS) $(TARNAME) $(TARSRCS)
