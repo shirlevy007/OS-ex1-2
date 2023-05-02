@@ -230,6 +230,9 @@ Thread * running_thread; // pointer to the running thread
  */
 void check_sleep_list(){
     // checking sleeping list for unblocked thread which are sone waiting
+    if(sleeping.empty()){
+        return;
+    }
     auto curr = sleeping.begin();
     while (curr != sleeping.end()){
         if (*curr== nullptr){ //when erased might create a problem
@@ -241,6 +244,9 @@ void check_sleep_list(){
                 ready_queue.push_back(*curr); // means sleep_quantums is 0 & not blocked
                 sleeping.erase(*curr);
             }
+        }
+        if(sleeping.empty()){
+            return;
         }
         curr++;
     }
@@ -582,7 +588,7 @@ int uthread_resume(int tid) {
         if(threads[tid]->get_sleep_quantums()==0){ // sleep_quantums==0 & no BLOCKED - so put back in ready_queue
             ready_queue.push_back(threads[tid]);
             sleeping.erase(threads[tid]);
-        } ///todo: make sure this IF
+        }
     }
 
     UNBLOCK_SIG_FUNC();
